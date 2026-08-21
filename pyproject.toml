@@ -1,0 +1,33 @@
+[project]
+name = "libraryapi"
+version = "0.1.0"
+description = ""
+authors = [
+    {name = "Vlad Spinul",email = "shinokakaov@mail.ru"}
+]
+requires-python = ">=3.14, <4.0"
+dependencies = [
+    "django (>=6.1,<7.0)",
+    "djangorestframework (>=3.18.0,<4.0.0)",
+    "python-dotenv (>=1.2.3,<2.0.0)",
+    "psycopg2-binary (>=2.9.12,<3.0.0)",
+    "gunicorn (>=26.1.0,<27.0.0)",
+    "drf-spectacular (>=0.30.0,<0.31.0)",
+    "djangorestframework-simplejwt (>=5.5.1,<6.0.0)"
+]
+
+[tool.poetry]
+package-mode = false
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[dependency-groups]
+lint = [
+    "flake8 (>=7.3.0,<8.0.0)"
+]
+dev = [
+    "coverage (>=7.15.4,<8.0.0)",
+    "ipython (>=9.16.1,<10.0.0)"
+]
