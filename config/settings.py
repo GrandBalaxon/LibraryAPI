@@ -28,6 +28,8 @@ INSTALLED_APPS = [
     "drf_spectacular",
 
     "users.apps.UsersConfig",
+    "catalog.apps.CatalogConfig",
+    "lending.apps.LendingConfig",
 ]
 
 MIDDLEWARE = [
