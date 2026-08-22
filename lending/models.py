@@ -1,6 +1,6 @@
 from django.db import models
 
-from catalog.models import Book
+from catalog.models import BookEdition
 from config import settings
 
 
@@ -19,7 +19,7 @@ class BookLoan(models.Model):
         verbose_name='Читатель'
     )
     book = models.ForeignKey(
-        Book,
+        BookEdition,
         on_delete=models.CASCADE,
         related_name='loans',
         verbose_name='Книга'
