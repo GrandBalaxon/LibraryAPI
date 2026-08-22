@@ -6,7 +6,6 @@ from config import settings
 
 class BookLoan(models.Model):
     """Запись о выдаче книги пользователю."""
-
     class Status(models.TextChoices):
         ACTIVE = 'active', 'Выдана'
         RETURNED = 'returned', 'Возвращена'
@@ -42,6 +41,7 @@ class BookLoan(models.Model):
         default=Status.ACTIVE,
         verbose_name='Статус'
     )
+    is_overdue = models.BooleanField(default=False, verbose_name='Возврат просрочен')
 
     class Meta:
         verbose_name = 'Выдача книги'
