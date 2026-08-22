@@ -122,8 +122,8 @@ class BookEdition(models.Model):
 
     class Meta:
         db_table = 'book_editions'
-        verbose_name = 'Издание книги'
-        verbose_name_plural = 'Издание книг'
+        verbose_name = 'Изданная книга'
+        verbose_name_plural = 'Изданные книги'
         ordering = ['title']
 
     def __str__(self):

@@ -1,22 +1,33 @@
 from django.contrib import admin
 from django.db.models import Count
 
-from catalog.models import Book, Author, Genre, Publisher
+from catalog.models import Book, Author, Genre, Publisher, BookEdition
 
 
 @admin.register(Author)
 class AuthorAdmin(admin.ModelAdmin):
-    list_display = ('full_name', 'pseudonym', 'birth_date', 'book_count')
+    list_display = ('full_name', 'pseudonym', 'birth_date', 'book_count', 'translations_count')
     search_fields = ('last_name', 'first_name', 'middle_name')
     list_filter = ('birth_date',)
 
     def get_queryset(self, request):
         queryset = super().get_queryset(request)
-        return queryset.annotate(book_count=Count('books'))
+        return queryset.annotate(
+            book_count=Count('books'),
+            translations_count=Count('translations', distinct=True)
+        )
 
-    @admin.display(description='Количество произведений', ordering='book_count')
+    @admin.display(description='Написанных произведений', ordering='book_count')
     def book_count(self, obj):
         return obj.book_count
+
+    @admin.display(description='Переведенных произведений', ordering='translations_count')
+    def translations_count(self, obj):
+        return obj.translations_count
+
+    @admin.display(description='Полное имя')
+    def full_name(self, obj):
+        return obj.full_name
 
 
 @admin.register(Genre)
@@ -76,3 +87,38 @@ class BookAdmin(admin.ModelAdmin):
     @admin.display(description='Количество изданий')
     def editions_count(self, obj):
         return obj.editions.count()
+
+
+@admin.register(BookEdition)
+class BookEditionAdmin(admin.ModelAdmin):
+    list_display = (
+        'title',
+        'book',
+        'isbn',
+        'publication_year',
+        'language',
+        'total_copies',
+        'available_copies'
+    )
+    list_filter = ('publishers', 'language', 'publication_year')
+    search_fields = (
+        'title',
+        'isbn',
+        'book__title',
+        'publishers__name',
+        'translators__last_name',
+        'translators__first_name'
+    )
+    filter_horizontal = ('publishers', 'translators')
+
+    def get_queryset(self, request):
+        queryset = super().get_queryset(request)
+        return queryset.select_related('book').prefetch_related('publishers', 'translators')
+
+    @admin.display(description='Издательства')
+    def display_publishers(self, obj):
+        return ', '.join([publisher.name for publisher in obj.publishers.all()])
+
+    @admin.display(description='Переводчики')
+    def display_translators(self, obj):
+        return ', '.join([str(translator) for translator in obj.translators.all()])
