@@ -7,7 +7,7 @@ from lending.models import BookLoan
 
 class BookLoanSerializer(serializers.ModelSerializer):
     """Сериализатор выдачи книги."""
-    edition = serializers.PrimaryKeyRelatedField(queryset=BookEdition.objects.all())
+    book = serializers.PrimaryKeyRelatedField(queryset=BookEdition.objects.all())
     user = serializers.PrimaryKeyRelatedField(read_only=True)
     status = serializers.ChoiceField(choices=BookLoan.Status.choices, read_only=True)
 
@@ -16,7 +16,7 @@ class BookLoanSerializer(serializers.ModelSerializer):
         fields = [
             'id',
             'user',
-            'edition',
+            'book',
             'borrowed_at',
             'due_date',
             'returned_at',
@@ -26,21 +26,21 @@ class BookLoanSerializer(serializers.ModelSerializer):
         read_only_fields = ['borrowed_at', 'due_date', 'returned_at', 'status', 'is_overdue']
 
     def validate(self, attrs):
-        edition = attrs.get('edition')
-        if edition.available_copies <= 0:
+        book = attrs.get('book')
+        if book.available_copies <= 0:
             raise serializers.ValidationError("Нет доступных экземпляров этого издания.")
         return attrs
 
     def create(self, validated_data):
         from django.db import transaction
         with transaction.atomic():
-            edition = validated_data['edition']
+            book = validated_data['book']
             # Блокируем для атомарности операции
-            edition = BookEdition.objects.select_for_update().get(pk=edition.pk)
-            if edition.available_copies <= 0:
+            book = BookEdition.objects.select_for_update().get(pk=book.pk)
+            if book.available_copies <= 0:
                 raise serializers.ValidationError("Нет доступных экземпляров этого издания.")
-            edition.available_copies -= 1
-            edition.save(update_fields=['available_copies'])
+            book.available_copies -= 1
+            book.save(update_fields=['available_copies'])
 
             validated_data['user'] = self.context['request'].user
             validated_data['status'] = BookLoan.Status.ACTIVE
@@ -53,9 +53,9 @@ class BookLoanSerializer(serializers.ModelSerializer):
             old_status = instance.status
             new_status = validated_data.get('status', old_status)
             if old_status != BookLoan.Status.RETURNED and new_status == BookLoan.Status.RETURNED:
-                edition = BookEdition.objects.select_for_update().get(pk=instance.edition_id)
-                edition.available_copies += 1
-                edition.save(update_fields=['available_copies'])
+                book = BookEdition.objects.select_for_update().get(pk=instance.edition_id)
+                book.available_copies += 1
+                book.save(update_fields=['available_copies'])
                 validated_data['returned_at'] = validated_data.get('returned_at') or timezone.now()
             instance = super().update(instance, validated_data)
             return instance
