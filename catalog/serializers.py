@@ -24,12 +24,12 @@ class AuthorSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['full_name']
 
-    def get_books_written(self, obj):
+    def get_books_written(self, obj) -> int:
         if hasattr(obj, 'book_count'):
             return obj.book_count
         return obj.books.count()
 
-    def get_books_translated(self, obj):
+    def get_books_translated(self, obj) -> int:
         if hasattr(obj, 'translations_count'):
             return obj.translations_count
         return obj.translations.count()

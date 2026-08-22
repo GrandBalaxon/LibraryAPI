@@ -32,7 +32,7 @@ class Author(models.Model):
         ordering = ['last_name', 'first_name']
 
     @property
-    def full_name(self):
+    def full_name(self) -> str:
         return f'{self.last_name} {self.first_name} {self.middle_name or ""}'.strip()
 
     def __str__(self):
