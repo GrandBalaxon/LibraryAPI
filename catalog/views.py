@@ -1,20 +1,23 @@
-from drf_spectacular.utils import extend_schema, extend_schema_view
-from rest_framework import viewsets
+from rest_framework import viewsets, filters
 
-from catalog.models import Author
-from catalog.serializers import AuthorSerializer
+from catalog.models import Author, Genre
+from catalog.serializers import AuthorSerializer, GenreSerializer
+from catalog.utils import standard_viewset_schema
 
 
-@extend_schema(tags=['Авторы книг и переводов'])
-@extend_schema_view(
-    list=extend_schema(summary='Список'),
-    create=extend_schema(summary='Создание'),
-    retrieve=extend_schema(summary='Детали'),
-    update=extend_schema(summary='Обновление'),
-    partial_update=extend_schema(summary='Частичное обновление'),
-    destroy=extend_schema(summary='Удаление')
-)
+@standard_viewset_schema(tags=['Авторы книг и переводов'])
 class AuthorViewSet(viewsets.ModelViewSet):
     """Вьюсет для работы с авторами."""
     queryset = Author.objects.all()
     serializer_class = AuthorSerializer
+    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
+    search_fields = ['first_name', 'last_name', 'middle_name', 'pseudonym']
+    ordering_fields = ['last_name', 'first_name', 'birth_date']
+
+
+@standard_viewset_schema(tags=['Жанры'])
+class GenreViewSet(viewsets.ModelViewSet):
+    queryset = Genre.objects.all()
+    serializer_class = GenreSerializer
+    filter_backends = [filters.SearchFilter]
+    search_fields = ['name']
