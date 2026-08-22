@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from catalog.models import Author, Genre, Publisher
+from catalog.models import Author, Genre, Publisher, Book
 
 
 class AuthorSerializer(serializers.ModelSerializer):
@@ -34,6 +34,13 @@ class AuthorSerializer(serializers.ModelSerializer):
         return obj.translations.count()
 
 
+class AuthorBriefSerializer(serializers.ModelSerializer):
+    """Краткая информация об авторе для вложенных объектов."""
+    class Meta:
+        model = Author
+        fields = ['id', 'full_name', 'pseudonym']
+
+
 class GenreSerializer(serializers.ModelSerializer):
     """Сериализатор для жанров."""
     class Meta:
@@ -46,3 +53,44 @@ class PublisherSerializer(serializers.ModelSerializer):
     class Meta:
         model = Publisher
         fields = ['id', 'name', 'description']
+
+
+class BookBriefSerializer(serializers.ModelSerializer):
+    """Краткая информация о произведении (базовый для полного)."""
+    authors = AuthorBriefSerializer(many=True, read_only=True)
+    genres = GenreSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Book
+        fields = [
+            'id',
+            'title',
+            'original_title',
+            'original_language',
+            'writing_year',
+            'authors',
+            'genres',
+            'description',
+        ]
+
+
+class BookSerializer(BookBriefSerializer):
+    """Полный сериализатор произведения с полями для записи связей."""
+    author_ids = serializers.PrimaryKeyRelatedField(
+        source='authors',
+        queryset=Author.objects.all(),
+        many=True,
+        write_only=True
+    )
+    genre_ids = serializers.PrimaryKeyRelatedField(
+        source='genres',
+        queryset=Genre.objects.all(),
+        many=True,
+        write_only=True
+    )
+
+    class Meta(BookBriefSerializer.Meta):
+        fields = BookBriefSerializer.Meta.fields + ['author_ids', 'genre_ids']
+
+
+
