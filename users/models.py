@@ -57,6 +57,12 @@ class CustomUser(AbstractUser):
     phone_number = models.CharField(max_length=15, verbose_name='Номер телефона')
     place_of_birth = models.CharField(max_length=150, verbose_name='Город рождения')
 
+    @property
+    def full_name(self):
+        """Возвращает полное имя пользователя."""
+        full_name = "%s %s %s" % (self.last_name, self.first_name, self.middle_name)
+        return full_name.strip()
+
     objects = CustomUserManager()
 
     USERNAME_FIELD = "email"
