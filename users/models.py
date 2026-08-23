@@ -60,8 +60,7 @@ class CustomUser(AbstractUser):
     @property
     def full_name(self):
         """Возвращает полное имя пользователя."""
-        full_name = "%s %s %s" % (self.last_name, self.first_name, self.middle_name)
-        return full_name.strip()
+        return f'{self.last_name} {self.first_name} {self.middle_name or ""}'.strip()
 
     objects = CustomUserManager()
 
