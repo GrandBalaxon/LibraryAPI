@@ -26,6 +26,7 @@ class UserSerializer(serializers.ModelSerializer):
             'loan_ids'
         ]
         extra_kwargs = {
+            'email': {'read_only': True},
             'password': {'write_only': True},
             'role': {'read_only': True},
         }
