@@ -7,6 +7,7 @@ from catalog.models import Author, Genre, Publisher, Book, BookEdition
 from catalog.serializers import AuthorSerializer, GenreSerializer, PublisherSerializer, BookSerializer, \
     BookEditionSerializer, CopyCountSerializer
 from catalog.utils import standard_viewset_schema
+from users.permissions import IsLibrarianOrReadOnly
 
 
 @standard_viewset_schema(tags=['Авторы книг и переводов'])
@@ -14,6 +15,7 @@ class AuthorViewSet(viewsets.ModelViewSet):
     """Вьюсет для работы с авторами."""
     queryset = Author.objects.all()
     serializer_class = AuthorSerializer
+    permission_classes = [IsLibrarianOrReadOnly]
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ['first_name', 'last_name', 'middle_name', 'pseudonym']
     ordering_fields = ['last_name', 'first_name', 'birth_date']
@@ -24,6 +26,7 @@ class GenreViewSet(viewsets.ModelViewSet):
     """Вьюсет для работы с жанрами."""
     queryset = Genre.objects.all()
     serializer_class = GenreSerializer
+    permission_classes = [IsLibrarianOrReadOnly]
     filter_backends = [filters.SearchFilter]
     search_fields = ['name']
 
@@ -33,6 +36,7 @@ class PublisherViewSet(viewsets.ModelViewSet):
     """Вьюсет для работы с издательствами."""
     queryset = Publisher.objects.all()
     serializer_class = PublisherSerializer
+    permission_classes = [IsLibrarianOrReadOnly]
     filter_backends = [filters.SearchFilter]
     search_fields = ['name']
 
@@ -42,6 +46,7 @@ class BookViewSet(viewsets.ModelViewSet):
     """Вьюсет для работы с произведениями."""
     queryset = Book.objects.all()
     serializer_class = BookSerializer
+    permission_classes = [IsLibrarianOrReadOnly]
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = [
         'title',
@@ -59,6 +64,7 @@ class BookEditionViewSet(viewsets.ModelViewSet):
     """Вьюсет для работы с конкретными изданиями книг."""
     queryset = BookEdition.objects.all()
     serializer_class = BookEditionSerializer
+    permission_classes = [IsLibrarianOrReadOnly]
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = [
         'title',

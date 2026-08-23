@@ -1,5 +1,6 @@
 from django.db import transaction
 from django.utils import timezone
+from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import extend_schema_view, extend_schema
 from rest_framework import viewsets, filters, status
 from rest_framework.decorators import action
@@ -8,6 +9,7 @@ from rest_framework.response import Response
 from catalog.utils import standard_viewset_schema
 from lending.models import BookLoan
 from lending.serializers import BookLoanSerializer
+from users.permissions import IsLibrarianOrReadOnly
 
 
 @standard_viewset_schema(tags=['Выдача книг'])
@@ -17,14 +19,17 @@ from lending.serializers import BookLoanSerializer
         description=(
                 'Отмечает выдачу как возвращённую, увеличивает количество доступных экземпляров книги'
                 ' на 1 и фиксирует дату возврата.'
-        )
+        ),
+        request=None
     )
 )
 class BookLoanViewSet(viewsets.ModelViewSet):
     """Вьюсет для работы с выдачей книг."""
     queryset = BookLoan.objects.all()
     serializer_class = BookLoanSerializer
-    filter_backends = [filters.OrderingFilter]
+    permission_classes = [IsLibrarianOrReadOnly]
+    filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
+    filterset_fields = ['user', 'status', 'book']
     ordering_fields = ['borrowed_at', 'due_date', 'status']
     ordering = ['-borrowed_at']
 
