@@ -146,3 +146,8 @@ class BookEditionSerializer(serializers.ModelSerializer):
         # Устанавливаем доступные копии равными общему количеству при создании
         validated_data['available_copies'] = validated_data.get('total_copies')
         return super().create(validated_data)
+
+
+class CopyCountSerializer(serializers.Serializer):
+    """Сериализатор для приёма количества копий."""
+    count = serializers.IntegerField(min_value=1, help_text='Количество копий')

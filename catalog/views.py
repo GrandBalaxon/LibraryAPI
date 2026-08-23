@@ -1,8 +1,11 @@
+from drf_spectacular.utils import extend_schema
 from rest_framework import viewsets, filters
+from rest_framework.decorators import action
+from rest_framework.response import Response
 
 from catalog.models import Author, Genre, Publisher, Book, BookEdition
 from catalog.serializers import AuthorSerializer, GenreSerializer, PublisherSerializer, BookSerializer, \
-    BookEditionSerializer
+    BookEditionSerializer, CopyCountSerializer
 from catalog.utils import standard_viewset_schema
 
 
@@ -66,3 +69,29 @@ class BookEditionViewSet(viewsets.ModelViewSet):
         'translators__last_name',
     ]
     ordering_fields = ['title', 'publication_year', 'total_copies', 'available_copies']
+
+    @extend_schema(summary='Добавление копий книги', request=CopyCountSerializer)
+    @action(detail=True, methods=['post'])
+    def add_copies(self, request, pk=None):
+        edition = self.get_object()
+        count = int(request.data.get('count', 0))
+        if count <= 0:
+            return Response({'detail': 'Укажите положительное число'}, status=400)
+        edition.total_copies += count
+        edition.available_copies += count
+        edition.save(update_fields=['total_copies', 'available_copies'])
+        return Response(BookEditionSerializer(edition).data)
+
+    @extend_schema(summary='Списание копий книги', request=CopyCountSerializer)
+    @action(detail=True, methods=['post'])
+    def remove_copies(self, request, pk=None):
+        edition = self.get_object()
+        count = int(request.data.get('count', 0))
+        if count <= 0:
+            return Response({'detail': 'Укажите положительное число'}, status=400)
+        if count > edition.available_copies:
+            return Response({'detail': 'Нельзя списать больше доступных копий'}, status=400)
+        edition.total_copies -= count
+        edition.available_copies -= count
+        edition.save(update_fields=['total_copies', 'available_copies'])
+        return Response(BookEditionSerializer(edition).data)
