@@ -1,4 +1,5 @@
 from django.db import models
+from django.utils import timezone
 
 from catalog.models import BookEdition
 from config import settings
@@ -6,10 +7,10 @@ from config import settings
 
 class BookLoan(models.Model):
     """Запись о выдаче книги пользователю."""
+
     class Status(models.TextChoices):
         ACTIVE = 'active', 'Выдана'
         RETURNED = 'returned', 'Возвращена'
-        OVERDUE = 'overdue', 'Просрочена'
 
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -27,8 +28,11 @@ class BookLoan(models.Model):
         auto_now_add=True,
         verbose_name='Дата выдачи'
     )
+    loan_period_days = models.PositiveIntegerField(default=30, verbose_name='Срок выдачи в днях')
     due_date = models.DateField(
-        verbose_name='Срок возврата'
+        blank=True,
+        null=True,
+        verbose_name='Ожидаемая дата возврата'
     )
     returned_at = models.DateTimeField(
         null=True,
@@ -41,7 +45,11 @@ class BookLoan(models.Model):
         default=Status.ACTIVE,
         verbose_name='Статус'
     )
-    is_overdue = models.BooleanField(default=False, verbose_name='Возврат просрочен')
+
+    @property
+    def is_overdue(self):
+        """Просрочен ли возврат книги."""
+        return self.status == self.Status.ACTIVE and self.due_date and self.due_date < timezone.localdate()
 
     class Meta:
         verbose_name = 'Выдача книги'
