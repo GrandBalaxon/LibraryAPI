@@ -6,7 +6,7 @@ from catalog.models import Book, Author, Genre, Publisher, BookEdition
 
 @admin.register(Author)
 class AuthorAdmin(admin.ModelAdmin):
-    list_display = ('full_name', 'pseudonym', 'birth_date', 'book_count', 'translations_count')
+    list_display = ('id', 'full_name', 'pseudonym', 'birth_date', 'book_count', 'translations_count')
     search_fields = ('last_name', 'first_name', 'middle_name')
     list_filter = ('birth_date',)
 
@@ -32,7 +32,7 @@ class AuthorAdmin(admin.ModelAdmin):
 
 @admin.register(Genre)
 class GenreAdmin(admin.ModelAdmin):
-    list_display = ('name', 'book_count')
+    list_display = ('id', 'name', 'book_count')
     search_fields = ('name',)
 
     def get_queryset(self, request):
@@ -46,7 +46,7 @@ class GenreAdmin(admin.ModelAdmin):
 
 @admin.register(Publisher)
 class PublisherAdmin(admin.ModelAdmin):
-    list_display = ('name', 'editions_count')
+    list_display = ('id', 'name', 'editions_count')
     search_fields = ('name',)
 
     def get_queryset(self, request):
@@ -61,6 +61,7 @@ class PublisherAdmin(admin.ModelAdmin):
 @admin.register(Book)
 class BookAdmin(admin.ModelAdmin):
     list_display = (
+        'id',
         'title',
         'original_title',
         'writing_year',
@@ -92,6 +93,7 @@ class BookAdmin(admin.ModelAdmin):
 @admin.register(BookEdition)
 class BookEditionAdmin(admin.ModelAdmin):
     list_display = (
+        'id',
         'title',
         'book',
         'isbn',
