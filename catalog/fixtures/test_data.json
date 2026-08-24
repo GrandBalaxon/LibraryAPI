@@ -1,0 +1,265 @@
+[
+{
+    "model": "catalog.author",
+    "pk": 1,
+    "fields": {
+        "first_name": "Эрик",
+        "last_name": "Блэр",
+        "middle_name": "Артур",
+        "birth_date": "1903-06-25",
+        "pseudonym": "Джордж Оруэлл",
+        "biography": "Британский писатель и публицист, классик антиутопической литературы. Служил в полиции в Бирме, воевал в Испании против франкистов. Мировую славу получил благодаря сатирической повести «Скотный двор» и роману-антиутопии «1984», в которых критиковал тоталитаризм и защищал идеалы демократического социализма."
+    }
+},
+{
+    "model": "catalog.author",
+    "pk": 2,
+    "fields": {
+        "first_name": "Ирина",
+        "last_name": "Мизинина",
+        "middle_name": "Николаевна",
+        "birth_date": null,
+        "pseudonym": null,
+        "biography": "Российский переводчик, кандидат филологических наук, доцент, автор переводов романа Дж. Оруэлла «1984» и учебных пособий по русскому языку."
+    }
+},
+{
+    "model": "catalog.author",
+    "pk": 3,
+    "fields": {
+        "first_name": "Джон",
+        "last_name": "Толкин",
+        "middle_name": "Рональд Руэл",
+        "birth_date": "1892-01-03",
+        "pseudonym": "Дж. Р. Р. Толкин",
+        "biography": "Английский писатель, лингвист и филолог, профессор Оксфордского университета. Считается «отцом» современной фэнтези-литературы. Родился в Южной Африке, в детстве переехал в Англию. Участник Первой мировой войны. Его глубокие познания в древнеанглийском и скандинавских языках легли в основу созданного им вымышленного мира — Средиземья, для которого он разработал детальную мифологию и уникальные языки, такие как эльфийский."
+    }
+},
+{
+    "model": "catalog.author",
+    "pk": 4,
+    "fields": {
+        "first_name": "Наталия",
+        "last_name": "Рахманова",
+        "middle_name": "Леонидовна",
+        "birth_date": "1930-11-24",
+        "pseudonym": null,
+        "biography": "Советская и российская переводчица, филолог-англист. Дочь писателя Леонида Рахманова. Автор первого полного и ставшего каноническим перевода повести Дж. Р. Р. Толкина «Хоббит, или Туда и обратно» (1976). За свою многолетнюю карьеру открыла русскоязычному читателю произведения таких классиков, как Б. Шоу, Г. Уэллс, К. Саймак, Дж. Даррелл, А. Кристи и У. Фолкнер. Член Союза писателей СССР с 1967 года."
+    }
+},
+{
+    "model": "catalog.genre",
+    "pk": 1,
+    "fields": {
+        "name": "Роман"
+    }
+},
+{
+    "model": "catalog.genre",
+    "pk": 2,
+    "fields": {
+        "name": "Антиутопия"
+    }
+},
+{
+    "model": "catalog.genre",
+    "pk": 3,
+    "fields": {
+        "name": "Детская литература"
+    }
+},
+{
+    "model": "catalog.genre",
+    "pk": 4,
+    "fields": {
+        "name": "Фэнтези"
+    }
+},
+{
+    "model": "catalog.genre",
+    "pk": 5,
+    "fields": {
+        "name": "Приключенческая литература"
+    }
+},
+{
+    "model": "catalog.publisher",
+    "pk": 1,
+    "fields": {
+        "name": "Яуза",
+        "description": "«Яуза» – одно из крупнейших издательств России и русского мира, выпускающая книги самых разных жанров. Одним из активных направлений стала историческая литература, но в портфеле издательства можно найти всё: от классического романа до сентиментальной прозы, от книг по искусству – к тому, что заинтересует юных читателей."
+    }
+},
+{
+    "model": "catalog.publisher",
+    "pk": 2,
+    "fields": {
+        "name": "АСТ",
+        "description": ""
+    }
+},
+{
+    "model": "catalog.book",
+    "pk": 1,
+    "fields": {
+        "title": "1984",
+        "original_title": "Nineteen Eighty-Four",
+        "original_language": "Английский",
+        "writing_year": 1948,
+        "description": "Культовый роман о тоталитарном обществе Океании, где власть Партии абсолютна, история переписывается, а Большой Брат следит за каждым.",
+        "authors": [
+            1
+        ],
+        "genres": [
+            1,
+            2
+        ]
+    }
+},
+{
+    "model": "catalog.book",
+    "pk": 2,
+    "fields": {
+        "title": "Хоббит, или Туда и обратно",
+        "original_title": "The Hobbit, or There and Back Again",
+        "original_language": "Английский",
+        "writing_year": 1937,
+        "description": "История о мирном хоббите Бильбо Бэггинсе, который по воле волшебника Гэндальфа оказывается втянут в опасный поход компании из тринадцати гномов. Их цель — достичь Одинокой Горы, победить дракона Смауга и вернуть утраченные сокровища гномов. В ходе путешествия Бильбо находит волшебное Кольцо, которое связывает эту историю с последующим эпосом «Властелин колец».",
+        "authors": [
+            3
+        ],
+        "genres": [
+            3,
+            4,
+            5
+        ]
+    }
+},
+{
+    "model": "catalog.bookedition",
+    "pk": 1,
+    "fields": {
+        "book": 1,
+        "title": "1984",
+        "isbn": "978-5-00155-298-7",
+        "publication_year": 2020,
+        "language": "Русский",
+        "total_copies": 6,
+        "available_copies": 6,
+        "publishers": [
+            1
+        ],
+        "translators": [
+            2
+        ]
+    }
+},
+{
+    "model": "catalog.bookedition",
+    "pk": 2,
+    "fields": {
+        "book": 2,
+        "title": "Хоббит, или Туда и Обратно",
+        "isbn": "978-5-17-081760-3",
+        "publication_year": 2013,
+        "language": "Русский",
+        "total_copies": 1,
+        "available_copies": 0,
+        "publishers": [
+            2
+        ],
+        "translators": [
+            4
+        ]
+    }
+},
+{
+    "model": "users.customuser",
+    "pk": 1,
+    "fields": {
+        "password": "pbkdf2_sha256$1500000$rCpYgq4n4oxhQlD2gGBGqB$B0DPvYhqK2Retim/CG+EsUgkNfT5GIsM9xwJW0JmkU0=",
+        "last_login": "2026-08-22T15:10:45Z",
+        "is_superuser": true,
+        "is_staff": true,
+        "is_active": true,
+        "date_joined": "2026-08-22T15:10:07Z",
+        "email": "admin@mail.ru",
+        "role": "librarian",
+        "first_name": "Админ",
+        "middle_name": "Грегорьевич",
+        "last_name": "Жульен",
+        "phone_number": "+7 (123) 456-78-90",
+        "place_of_birth": "Москва",
+        "groups": [],
+        "user_permissions": []
+    }
+},
+{
+    "model": "users.customuser",
+    "pk": 2,
+    "fields": {
+        "password": "pbkdf2_sha256$1500000$F1SJc4JPJL4b98WJzI0W1J$QXM/ITw6+2XXC0h7miC+XHxhPGC6fU+PeIrK/4t8pis=",
+        "last_login": null,
+        "is_superuser": false,
+        "is_staff": false,
+        "is_active": true,
+        "date_joined": "2026-08-23T12:12:10Z",
+        "email": "uwu2000@mail.ru",
+        "role": "reader",
+        "first_name": "Юно",
+        "middle_name": null,
+        "last_name": "Гасаи",
+        "phone_number": "+7 (123) 456-78-99",
+        "place_of_birth": "Токио",
+        "groups": [],
+        "user_permissions": []
+    }
+},
+{
+    "model": "users.customuser",
+    "pk": 3,
+    "fields": {
+        "password": "pbkdf2_sha256$1500000$MZoz3NMCeJ6n9kvyJXfUQ5$aB0PpHl0qxcvrMMeSTsgVp5bhkEAeudk3C1MQPQ0jG0=",
+        "last_login": null,
+        "is_superuser": false,
+        "is_staff": false,
+        "is_active": true,
+        "date_joined": "2026-08-23T19:44:31.990Z",
+        "email": "chernika_forte_2000@mail.ru",
+        "role": "reader",
+        "first_name": "Иван",
+        "middle_name": "Иванович",
+        "last_name": "Иванов",
+        "phone_number": "+7 (911) 444-00-04",
+        "place_of_birth": "Обнинск",
+        "groups": [],
+        "user_permissions": []
+    }
+},
+{
+    "model": "lending.bookloan",
+    "pk": 1,
+    "fields": {
+        "user": 2,
+        "book": 1,
+        "borrowed_at": "2026-08-23T12:13:45.817Z",
+        "loan_period_days": 30,
+        "due_date": "2026-09-23",
+        "returned_at": "2026-08-23T12:28:37.082Z",
+        "status": "returned"
+    }
+},
+{
+    "model": "lending.bookloan",
+    "pk": 2,
+    "fields": {
+        "user": 3,
+        "book": 2,
+        "borrowed_at": "2026-08-23T20:53:32.172Z",
+        "loan_period_days": 33,
+        "due_date": "2026-09-25T20:53:32.172Z",
+        "returned_at": null,
+        "status": "active"
+    }
+}
+]

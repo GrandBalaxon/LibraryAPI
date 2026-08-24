@@ -5,6 +5,8 @@
 ![DRF](https://img.shields.io/badge/django%20rest%20framework-3.18-red.svg)
 ![PostgreSQL](https://img.shields.io/badge/postgresql-16-blue.svg)
 ![Docker](https://img.shields.io/badge/docker-compose-blue.svg)
+![OpenAPI](https://img.shields.io/badge/OpenAPI-3.0-blue.svg)
+![License](https://img.shields.io/badge/license-MIT-green.svg)
 
 REST API для управления библиотекой, разработанный на Django Rest Framework. 
 Позволяет управлять книгами, авторами, пользователями, а также отслеживать выдачу и возврат книг. 
@@ -18,6 +20,8 @@ REST API для управления библиотекой, разработа�
 - Simple JWT
 - drf-spectacular (OpenAPI 3, Swagger UI)
 - Docker, Docker Compose
+- nginx
+- gunicorn
 
 ## Требования
 
@@ -40,7 +44,10 @@ REST API для управления библиотекой, разработа�
     ```bash
     poetry install
     ```
-5. Убедитесь, что PostgreSQL запущен локально, либо поднимите его в Docker.
+5. Убедитесь, что PostgreSQL запущен локально, либо поднимите его в Docker, для этого выполните команду
+    ```bash
+    docker compose up db -d
+    ```
 6. Применение миграций
     ```bash
     python manage.py migrate
@@ -63,6 +70,24 @@ REST API для управления библиотекой, разработа�
     docker compose up -d --build
     ```
    Проект будет доступен по адресу http://localhost/.
+
+   После запуска контейнеров все миграции будут выполнены автоматически, дополнительных действий не требуется.
+
+## 🧪 Тестовые данные (фикстура)
+
+В проекте есть готовая фикстура с демонстрационными данными: пользователи, книги, авторы, издания, выдачи.  
+Файл: `catalog/fixtures/test_data.json`
+
+### Загрузка фикстуры
+
+1. Убедитесь, что все миграции применены:
+   ```bash
+   python manage.py migrate
+   ```
+2. Загрузите данные:
+   ```bash
+   python manage.py loaddata catalog/fixtures/test_data.json
+   ```
 
 ## 🔑 Основные эндпоинты
 
@@ -118,6 +143,11 @@ REST API для управления библиотекой, разработа�
 
 * `POST /api/lending/{id}/return/` — возврат книги
 
+## 🔒 Роли и права доступа
+
+* `Читатель` — может просматривать каталог, свои выдачи, редактировать свой профиль.
+
+* `Библиотекарь` — полный доступ к каталогу, выдаче, списку пользователей.
 
 ## 🏗️ Структура проекта
 
