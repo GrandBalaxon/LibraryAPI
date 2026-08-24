@@ -112,6 +112,7 @@ class BookEditionAdmin(admin.ModelAdmin):
         'translators__first_name'
     )
     filter_horizontal = ('publishers', 'translators')
+    readonly_fields = ('total_copies', 'available_copies')
 
     def get_queryset(self, request):
         queryset = super().get_queryset(request)
