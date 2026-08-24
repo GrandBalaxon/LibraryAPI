@@ -11,8 +11,8 @@ urlpatterns = [
     path('api/lending/', include('lending.urls'), name='lending'),
 
     # drf-spectacular документирование
-    path('schema/', SpectacularAPIView.as_view(), name='schema'),
-    path('docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='docs'),
+    path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
+    path('api/docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='docs'),
 
     path('', RedirectView.as_view(url='docs/')),
 ]
