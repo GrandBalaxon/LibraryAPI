@@ -11,7 +11,7 @@ load_dotenv()
 SECRET_KEY = os.getenv("SECRET_KEY")
 DEBUG = True if os.getenv("DEBUG").lower() == "true" else False
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['*']
 
 
 # Application definition
@@ -25,7 +25,12 @@ INSTALLED_APPS = [
 
     "rest_framework",
     "rest_framework_simplejwt",
-    "drf_spectacular"
+    "drf_spectacular",
+    "django_filters",
+
+    "users.apps.UsersConfig",
+    "catalog.apps.CatalogConfig",
+    "lending.apps.LendingConfig",
 ]
 
 MIDDLEWARE = [
@@ -60,7 +65,7 @@ WSGI_APPLICATION = "config.wsgi.application"
 # Database
 DATABASES = {
     "default": {
-        "ENGINE": "django.db.backends.postgresql_psycopg2",
+        'ENGINE': 'django.db.backends.postgresql',
         'NAME': os.getenv('POSTGRES_DB'),
         'USER': os.getenv('POSTGRES_USER'),
         'PASSWORD': os.getenv('POSTGRES_PASSWORD'),
@@ -68,6 +73,8 @@ DATABASES = {
         'PORT': os.getenv('POSTGRES_PORT'),
     }
 }
+
+AUTH_USER_MODEL = "users.CustomUser"
 
 AUTH_PASSWORD_VALIDATORS = [
     {
@@ -104,4 +111,17 @@ MAILERS = {
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(minutes=30),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
+}
+
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+    ],
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.IsAuthenticated',
+    ],
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+    'DEFAULT_FILTER_BACKENDS': [
+        'django_filters.rest_framework.DjangoFilterBackend'
+    ],
 }
