@@ -1,4 +1,5 @@
 from datetime import timedelta
+from typing import Any
 
 from django.db import transaction
 from django.utils import timezone
@@ -36,18 +37,18 @@ class BookLoanSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['borrowed_at', 'returned_at', 'status', 'is_overdue']
 
-    def validate(self, attrs):
-        book = attrs.get('book')
+    def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
+        book: BookEdition = attrs.get('book')
         if book.available_copies <= 0:
             raise serializers.ValidationError("Нет доступных экземпляров этого издания.")
         return attrs
 
-    def create(self, validated_data):
-        loan_period_days = validated_data.get('loan_period_days', 30)
+    def create(self, validated_data: dict[str, Any]) -> BookLoan:
+        loan_period_days: int = validated_data.get('loan_period_days', 30)
         due_date = validated_data.get('due_date')
 
         with transaction.atomic():
-            book = validated_data['book']
+            book: BookEdition = validated_data['book']
             # Блокируем для атомарности операции
             book = BookEdition.objects.select_for_update().get(pk=book.pk)
             if book.available_copies <= 0:
@@ -64,9 +65,11 @@ class BookLoanSerializer(serializers.ModelSerializer):
             validated_data['loan_period_days'] = loan_period_days
 
             validated_data['status'] = BookLoan.Status.ACTIVE
-            return super().create(validated_data)
 
-    def update(self, instance, validated_data):
+            instance: BookLoan = super().create(validated_data)
+            return instance
+
+    def update(self, instance: BookLoan, validated_data: dict[str, Any]) -> BookLoan:
         # Обрабатываем только случай возврата (меняем статус на RETURNED)
         with transaction.atomic():
             old_status = instance.status
@@ -78,5 +81,5 @@ class BookLoanSerializer(serializers.ModelSerializer):
                 book.save(update_fields=['available_copies'])
                 validated_data['returned_at'] = validated_data.get('returned_at') or timezone.now()
 
-            instance = super().update(instance, validated_data)
-            return instance
+            updated_instance: BookLoan = super().update(instance, validated_data)
+            return updated_instance

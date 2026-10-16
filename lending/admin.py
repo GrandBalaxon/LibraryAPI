@@ -3,6 +3,8 @@ from datetime import timedelta
 from django.contrib import admin, messages
 from django.core.exceptions import ValidationError
 from django.db import transaction
+from django.forms.models import ModelForm
+from django.http import HttpRequest
 from django.utils import timezone
 
 from catalog.models import BookEdition
@@ -17,7 +19,7 @@ class BookLoanAdmin(admin.ModelAdmin):
     date_hierarchy = 'borrowed_at'
     autocomplete_fields = ['user', 'book']
 
-    def get_readonly_fields(self, request, obj=None):
+    def get_readonly_fields(self, request: HttpRequest, obj: BookLoan | None = None) -> tuple[str, ...]:
         readonly_fields = ('borrowed_at', 'returned_at', 'status', 'loan_period_days')
         # если объект уже создан
         if obj:
@@ -28,7 +30,7 @@ class BookLoanAdmin(admin.ModelAdmin):
         else:
             return readonly_fields
 
-    def save_model(self, request, obj, form, change):
+    def save_model(self, request: HttpRequest, obj: BookLoan, form: ModelForm, change: bool) -> None:
         """При создании уменьшаем available_copies у издания, при возврате увеличиваем."""
 
         # если новая запись выдачи книги

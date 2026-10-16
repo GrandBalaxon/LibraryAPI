@@ -47,7 +47,7 @@ class BookLoan(models.Model):
     )
 
     @property
-    def is_overdue(self):
+    def is_overdue(self) -> bool:
         """Просрочен ли возврат книги."""
         return self.status == self.Status.ACTIVE and self.due_date and self.due_date < timezone.localdate()
 
@@ -56,5 +56,5 @@ class BookLoan(models.Model):
         verbose_name_plural = 'Выдачи книг'
         ordering = ['-borrowed_at']
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f'{self.user} — {self.book} ({self.get_status_display()})'

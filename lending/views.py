@@ -1,14 +1,19 @@
+from typing import Any
+
 from django.db import transaction
+from django.db.models import QuerySet
 from django.utils import timezone
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import extend_schema_view, extend_schema
 from rest_framework import viewsets, filters, status
 from rest_framework.decorators import action
+from rest_framework.request import Request
 from rest_framework.response import Response
 
 from catalog.utils import standard_viewset_schema
 from lending.models import BookLoan
 from lending.serializers import BookLoanSerializer
+from users.models import CustomUser
 from users.permissions import IsLibrarianOrReadOnly
 
 
@@ -25,7 +30,7 @@ from users.permissions import IsLibrarianOrReadOnly
 )
 class BookLoanViewSet(viewsets.ModelViewSet):
     """Вьюсет для работы с выдачей книг."""
-    queryset = BookLoan.objects.all()
+    queryset: QuerySet[BookLoan] = BookLoan.objects.all()
     serializer_class = BookLoanSerializer
     permission_classes = [IsLibrarianOrReadOnly]
     filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
@@ -33,15 +38,17 @@ class BookLoanViewSet(viewsets.ModelViewSet):
     ordering_fields = ['borrowed_at', 'due_date', 'status']
     ordering = ['-borrowed_at']
 
-    def get_queryset(self):
-        user = self.request.user
+    def get_queryset(self) -> QuerySet[BookLoan]:
+        user: CustomUser | Any = self.request.user
+
         if user.role == 'librarian':
             return super().get_queryset()
         return super().get_queryset().filter(user=user)
 
     @action(methods=['post'], detail=True, url_path='return')
-    def return_book(self, request, pk=None):
+    def return_book(self, request: Request, pk: str | None = None) -> Response:
         loan = self.get_object()
+
         if loan.status == BookLoan.Status.RETURNED:
             return Response(
                 {'detail': 'Книга уже возвращена.'},
@@ -59,4 +66,5 @@ class BookLoanViewSet(viewsets.ModelViewSet):
             loan.save(update_fields=['status', 'returned_at'])
             loan.book.available_copies += 1
             loan.book.save(update_fields=['available_copies'])
+
         return Response(BookLoanSerializer(loan).data)
