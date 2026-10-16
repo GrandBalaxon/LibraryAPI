@@ -1,6 +1,7 @@
 from drf_spectacular.utils import extend_schema
 from rest_framework import viewsets, filters
 from rest_framework.decorators import action
+from rest_framework.request import Request
 from rest_framework.response import Response
 
 from catalog.models import Author, Genre, Publisher, Book, BookEdition
@@ -78,8 +79,8 @@ class BookEditionViewSet(viewsets.ModelViewSet):
 
     @extend_schema(summary='Добавление копий книги', request=CopyCountSerializer)
     @action(detail=True, methods=['post'])
-    def add_copies(self, request, pk=None):
-        edition = self.get_object()
+    def add_copies(self, request: Request, pk: str | None = None) -> Response:
+        edition: BookEdition = self.get_object()
         count = int(request.data.get('count', 0))
         if count <= 0:
             return Response({'detail': 'Укажите положительное число'}, status=400)
@@ -90,8 +91,8 @@ class BookEditionViewSet(viewsets.ModelViewSet):
 
     @extend_schema(summary='Списание копий книги', request=CopyCountSerializer)
     @action(detail=True, methods=['post'])
-    def remove_copies(self, request, pk=None):
-        edition = self.get_object()
+    def remove_copies(self, request: Request, pk: str | None = None) -> Response:
+        edition: BookEdition = self.get_object()
         count = int(request.data.get('count', 0))
         if count <= 0:
             return Response({'detail': 'Укажите положительное число'}, status=400)

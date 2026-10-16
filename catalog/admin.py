@@ -1,5 +1,6 @@
 from django.contrib import admin
-from django.db.models import Count
+from django.db.models import Count, QuerySet
+from django.http import HttpRequest
 
 from catalog.models import Book, Author, Genre, Publisher, BookEdition
 
@@ -10,7 +11,7 @@ class AuthorAdmin(admin.ModelAdmin):
     search_fields = ('last_name', 'first_name', 'middle_name')
     list_filter = ('birth_date',)
 
-    def get_queryset(self, request):
+    def get_queryset(self, request: HttpRequest) -> QuerySet[Author]:
         queryset = super().get_queryset(request)
         return queryset.annotate(
             book_count=Count('books'),
@@ -18,15 +19,15 @@ class AuthorAdmin(admin.ModelAdmin):
         )
 
     @admin.display(description='Написанных произведений', ordering='book_count')
-    def book_count(self, obj):
+    def book_count(self, obj) -> int:
         return obj.book_count
 
     @admin.display(description='Переведенных произведений', ordering='translations_count')
-    def translations_count(self, obj):
+    def translations_count(self, obj) -> int:
         return obj.translations_count
 
     @admin.display(description='Полное имя')
-    def full_name(self, obj):
+    def full_name(self, obj) -> str:
         return obj.full_name
 
 
@@ -35,12 +36,12 @@ class GenreAdmin(admin.ModelAdmin):
     list_display = ('id', 'name', 'book_count')
     search_fields = ('name',)
 
-    def get_queryset(self, request):
+    def get_queryset(self, request: HttpRequest) -> QuerySet[Genre]:
         queryset = super().get_queryset(request)
         return queryset.annotate(book_count=Count('books'))
 
     @admin.display(description='Количество произведений', ordering='book_count')
-    def book_count(self, obj):
+    def book_count(self, obj) -> int:
         return obj.book_count
 
 
@@ -49,12 +50,12 @@ class PublisherAdmin(admin.ModelAdmin):
     list_display = ('id', 'name', 'editions_count')
     search_fields = ('name',)
 
-    def get_queryset(self, request):
+    def get_queryset(self, request: HttpRequest) -> QuerySet[Publisher]:
         queryset = super().get_queryset(request)
         return queryset.annotate(editions_count=Count('editions'))
 
     @admin.display(description='Количество изданных книг', ordering='editions_count')
-    def editions_count(self, obj):
+    def editions_count(self, obj) -> int:
         return obj.editions_count
 
 
@@ -73,20 +74,20 @@ class BookAdmin(admin.ModelAdmin):
     search_fields = ('title', 'authors__last_name', 'authors__first_name', 'authors__pseudonym')
     filter_horizontal = ('authors', 'genres')
 
-    def get_queryset(self, request):
+    def get_queryset(self, request: HttpRequest) -> QuerySet[Book]:
         queryset = super().get_queryset(request)
         return queryset.prefetch_related('authors', 'genres').annotate(editions_count=Count('editions'))
 
     @admin.display(description='Авторы')
-    def display_authors(self, obj):
+    def display_authors(self, obj) -> str:
         return ', '.join([str(author) for author in obj.authors.all()])
 
     @admin.display(description='Жанры')
-    def display_genres(self, obj):
+    def display_genres(self, obj) -> str:
         return ', '.join([genre.name for genre in obj.genres.all()])
 
     @admin.display(description='Количество изданий')
-    def editions_count(self, obj):
+    def editions_count(self, obj) -> int:
         return obj.editions.count()
 
 
@@ -114,14 +115,14 @@ class BookEditionAdmin(admin.ModelAdmin):
     filter_horizontal = ('publishers', 'translators')
     readonly_fields = ('total_copies', 'available_copies')
 
-    def get_queryset(self, request):
+    def get_queryset(self, request: HttpRequest) -> QuerySet[BookEdition]:
         queryset = super().get_queryset(request)
         return queryset.select_related('book').prefetch_related('publishers', 'translators')
 
     @admin.display(description='Издательства')
-    def display_publishers(self, obj):
+    def display_publishers(self, obj) -> str:
         return ', '.join([publisher.name for publisher in obj.publishers.all()])
 
     @admin.display(description='Переводчики')
-    def display_translators(self, obj):
+    def display_translators(self, obj) -> str:
         return ', '.join([str(translator) for translator in obj.translators.all()])

@@ -35,7 +35,7 @@ class Author(models.Model):
     def full_name(self) -> str:
         return f'{self.last_name} {self.first_name} {self.middle_name or ""}'.strip()
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.full_name
 
 
@@ -47,7 +47,7 @@ class Genre(models.Model):
         verbose_name = 'Жанр'
         verbose_name_plural = 'Жанры'
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.name
 
 
@@ -60,7 +60,7 @@ class Publisher(models.Model):
         verbose_name = 'Издательство'
         verbose_name_plural = 'Издательства'
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.name
 
 
@@ -84,7 +84,7 @@ class Book(models.Model):
         verbose_name_plural = 'Произведения'
         ordering = ['title']
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.title
 
 
@@ -126,10 +126,10 @@ class BookEdition(models.Model):
         verbose_name_plural = 'Изданные книги'
         ordering = ['title']
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f'{self.title} ({self.publication_year})'
 
-    def clean(self):
+    def clean(self) -> None:
         super().clean()
         if self.isbn:
             try:
