@@ -32,5 +32,5 @@ class CustomUserAdmin(UserAdmin):
     )
 
     @admin.display(description='Полное имя')
-    def full_name(self, obj):
+    def full_name(self, obj: CustomUser) -> str:
         return obj.full_name

@@ -1,7 +1,11 @@
+from typing import Any
+
+from django.db.models import QuerySet
 from drf_spectacular.utils import extend_schema, extend_schema_view
 from rest_framework import viewsets, generics, mixins
 from rest_framework.decorators import action
-from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework.permissions import IsAuthenticated, AllowAny, BasePermission
+from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework_simplejwt.views import TokenRefreshView, TokenObtainPairView
 
@@ -58,10 +62,10 @@ class UserViewSet(
     viewsets.GenericViewSet,
 ):
     """Вьюсет для пользователей."""
-    queryset = CustomUser.objects.all()
+    queryset: QuerySet[CustomUser] = CustomUser.objects.all()
     serializer_class = UserSerializer
 
-    def get_permissions(self):
+    def get_permissions(self) -> list[BasePermission]:
         if self.action in ["list", "destroy"]:
             return [IsAuthenticated(), IsLibrarian()]
         if self.action in ["update", "partial_update", "retrieve"]:
@@ -70,19 +74,19 @@ class UserViewSet(
             return [IsAuthenticated()]
         return [IsAuthenticated(), IsLibrarian()]
 
-    def get_queryset(self):
-        user = self.request.user
+    def get_queryset(self) -> QuerySet[CustomUser]:
+        user: CustomUser | Any = self.request.user
         if user.role == CustomUser.Role.LIBRARIAN:
             return CustomUser.objects.all()
         return CustomUser.objects.filter(pk=user.pk)
 
     @extend_schema(summary="Получить свой профиль", responses={200: UserSerializer})
     @action(detail=False, methods=["get"])
-    def me(self, request):
+    def me(self, request: Request) -> Response:
         serializer = self.get_serializer(request.user)
         return Response(serializer.data)
 
-    def perform_destroy(self, instance):
+    def perform_destroy(self, instance: CustomUser) -> None:
         """Вместо удаления деактивируем пользователя."""
         instance.is_active = False
         instance.save(update_fields=["is_active"])

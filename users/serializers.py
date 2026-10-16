@@ -1,3 +1,5 @@
+from typing import Any
+
 from rest_framework import serializers
 
 from users.models import CustomUser
@@ -30,12 +32,12 @@ class UserSerializer(serializers.ModelSerializer):
             'role': {'read_only': True},
         }
 
-    def create(self, validated_data):
+    def create(self, validated_data: dict[str, Any]) -> CustomUser:
         password = validated_data.pop('password')
         user = CustomUser.objects.create_user(password=password, **validated_data)
         return user
 
-    def update(self, instance, validated_data):
+    def update(self, instance: CustomUser, validated_data: dict[str, Any]) -> CustomUser:
         password = validated_data.pop('password', None)
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
@@ -44,7 +46,7 @@ class UserSerializer(serializers.ModelSerializer):
         instance.save()
         return instance
 
-    def validate_phone_number(self, value):
+    def validate_phone_number(self, value: str) -> str:
         normalized = CustomUser.normalize_phone_number(value)
         if normalized is None:
             raise serializers.ValidationError('Некорректный номер телефона.')
