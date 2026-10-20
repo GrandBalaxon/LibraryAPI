@@ -139,21 +139,21 @@ class BaseAPITestCase(APITestCase):
 
     # ---------- Хелперы: аутентификация ----------
 
-    def login_reader(self):
+    def login_reader(self) -> None:
         """Аутентифицировать клиент как читателя."""
         self.client.force_authenticate(self.user_reader)
 
-    def login_librarian(self):
+    def login_librarian(self) -> None:
         """Аутентифицировать клиент как библиотекаря."""
         self.client.force_authenticate(self.user_librarian)
 
-    def logout(self):
+    def logout(self) -> None:
         """Сбросить аутентификацию клиента."""
         self.client.force_authenticate(None)
 
     # ---------- Хелперы: данные ----------
 
-    def set_available_copies(self, edition, count):
+    def set_available_copies(self, edition: BookEdition, count: int) -> BookEdition:
         """
         Установить edition.available_copies = count.
 
