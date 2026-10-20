@@ -59,6 +59,16 @@ class PublisherViewSet(viewsets.ModelViewSet):
     filter_backends = [filters.SearchFilter]
     search_fields = ['name']
 
+    def destroy(self, request, *args, **kwargs):
+        publisher = self.get_object()
+        # Проверяем, есть ли у издательства изданные книги в библиотеке
+        if publisher.editions.exists():
+            return Response(
+                {'detail': 'Нельзя удалить издательство, так как у него есть изданные книги.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        return super().destroy(request, *args, **kwargs)
+
 
 @standard_viewset_schema(tags=['Произведения'])
 class BookViewSet(viewsets.ModelViewSet):
