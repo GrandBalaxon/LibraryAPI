@@ -1,3 +1,4 @@
+from catalog.models import Author
 from catalog.tests.base import BaseAPITestCase
 
 
@@ -7,7 +8,7 @@ class AuthorAPITest(BaseAPITestCase):
     def setUp(self):
         super().setUp()
         self.url = '/api/catalog/authors/'
-        self.details_url = f"{self.url}1/"
+        self.details_url = f"{self.url}{self.author.id}/"
         self.data = {
             "first_name": "Тест",
             "last_name": "Тестовый",
@@ -143,3 +144,30 @@ class AuthorAPITest(BaseAPITestCase):
         # Успешно удаляем автора
         deletion_response = self.client.delete(created_author_url)
         self.assertEqual(deletion_response.status_code, 204)
+
+        # Проверяем, что автора нет в БД, 404 NOT FOUND
+        after_delete_response = self.client.get(created_author_url)
+        self.assertEqual(after_delete_response.status_code, 404)
+
+    def test_librarian_cannot_delete_author_with_book_editions(self):
+        """
+        Библиотекарь НЕ может просто взять и удалить автора у которого есть книги, экземпляры которых уже
+        представлены в библиотеке или находятся на руках у читателей.
+
+        То есть у автора есть написанные им произведения (Books), у которых есть книги (BookEditions), находящиеся
+        в датабазе библиотеки и их количество (total_copies) не равно нулю.
+        """
+        self.login_librarian()
+
+        # Проверяем, что автор существует до удаления
+        response = self.client.get(self.details_url)
+        self.assertEqual(response.status_code, 200)
+
+        # Пытаемся удалить автора
+        deletion_response = self.client.delete(self.details_url)
+
+        # Ожидаем 400 (Bad Request), так как удаление должно быть заблокировано
+        self.assertEqual(deletion_response.status_code, 400)
+
+        # Проверяем, что автор остался в базе данных
+        self.assertTrue(Author.objects.filter(id=self.author.id).exists())

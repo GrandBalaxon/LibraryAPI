@@ -1,5 +1,6 @@
+from IPython.core.release import author
 from drf_spectacular.utils import extend_schema
-from rest_framework import viewsets, filters
+from rest_framework import viewsets, filters, status
 from rest_framework.decorators import action
 from rest_framework.request import Request
 from rest_framework.response import Response
@@ -20,6 +21,24 @@ class AuthorViewSet(viewsets.ModelViewSet):
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ['first_name', 'last_name', 'middle_name', 'pseudonym']
     ordering_fields = ['last_name', 'first_name', 'birth_date']
+
+    def destroy(self, request: Request, *args, **kwargs) -> Response:
+        """Запрещаем удаление автора, если в библиотеке есть экземпляры его книг."""
+        author: Author = self.get_object()
+
+        # Ищем издания книг этого автора, у которых есть копии (total_copies > 0)
+        has_copies = BookEdition.objects.filter(
+            book__authors=author,
+            total_copies__gt=0
+        ).exists()
+
+        if has_copies:
+            return Response(
+                {'detail': 'Нельзя удалить автора, так как в библиотеке есть экземпляры его произведений.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        return super().destroy(request, *args, **kwargs)
 
 
 @standard_viewset_schema(tags=['Жанры'])
