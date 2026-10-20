@@ -1,4 +1,8 @@
-# LibraryAPI — REST API для управления библиотекой
+<div align="center">
+  <img src="artwork/social_preview.png" alt="LibraryAPI Banner" width="100%">
+</div>
+
+<div align="center">
 
 ![Python](https://img.shields.io/badge/python-3.14-blue.svg)
 ![Django](https://img.shields.io/badge/django-6.1-green.svg)
@@ -7,6 +11,8 @@
 ![Docker](https://img.shields.io/badge/docker-compose-blue.svg)
 ![OpenAPI](https://img.shields.io/badge/OpenAPI-3.0-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
+
+</div>
 
 REST API для управления библиотекой, разработанный на Django Rest Framework. 
 Позволяет управлять книгами, авторами, пользователями, а также отслеживать выдачу и возврат книг. 
