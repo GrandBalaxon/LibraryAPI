@@ -1,4 +1,3 @@
-from IPython.core.release import author
 from drf_spectacular.utils import extend_schema
 from rest_framework import viewsets, filters, status
 from rest_framework.decorators import action

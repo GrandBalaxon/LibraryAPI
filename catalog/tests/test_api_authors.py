@@ -171,3 +171,64 @@ class AuthorAPITest(BaseAPITestCase):
 
         # Проверяем, что автор остался в базе данных
         self.assertTrue(Author.objects.filter(id=self.author.id).exists())
+
+    def test_search_author_by_pseudonym(self):
+        """Проверка поиска автора по псевдониму (SearchFilter)."""
+        self.login_reader()
+        # Ищем "Оруэлл". В базе это псевдоним Эрика Блэра.
+        response = self.client.get(self.url, {'search': 'Оруэлл'})
+
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+
+        # Должен вернуться только один автор
+        self.assertEqual(len(data), 1)
+        self.assertEqual(data[0]['last_name'], 'Блэр')
+        self.assertEqual(data[0]['pseudonym'], 'Джордж Оруэлл')
+
+    def test_search_author_by_last_name(self):
+        """Проверка поиска автора по фамилии (SearchFilter)."""
+        self.login_reader()
+        response = self.client.get(self.url, {'search': 'Толкин'})
+
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(len(data), 1)
+        self.assertEqual(data[0]['first_name'], 'Джон')
+
+    def test_search_author_not_found(self):
+        """Поиск несуществующего автора возвращает пустой список."""
+        self.login_reader()
+        response = self.client.get(self.url, {'search': 'Гарри Поттер'})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.json()), 0)
+
+    def test_ordering_authors_by_last_name_desc(self):
+        """Проверка сортировки по фамилии (по убыванию)."""
+        self.login_reader()
+        # В базе: Блэр, Мизинина, Рахманова, Толкин.
+        # По убыванию первым должен идти Толкин.
+        response = self.client.get(self.url, {'ordering': '-last_name'})
+
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+
+        self.assertEqual(data[0]['last_name'], 'Толкин')
+        self.assertEqual(data[-1]['last_name'], 'Блэр')  # Последний - Блэр
+
+    def test_ordering_authors_by_birth_date_asc(self):
+        """Проверка сортировки по дате рождения (по возрастанию)."""
+        self.login_reader()
+        response = self.client.get(self.url, {'ordering': 'birth_date'})
+
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+
+        # В SQLite NULL значения идут первыми, поэтому Мизинина (без даты) - первая.
+        self.assertEqual(data[0]['last_name'], 'Мизинина')
+
+        # Среди тех, у кого есть дата, самый старый - Толкин (1892)
+        self.assertEqual(data[1]['last_name'], 'Толкин')
+        self.assertEqual(data[2]['last_name'], 'Блэр')
+        self.assertEqual(data[3]['last_name'], 'Рахманова')
