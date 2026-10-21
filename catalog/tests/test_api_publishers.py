@@ -1,4 +1,3 @@
-from catalog.models import Publisher
 from catalog.tests.base import BaseAPITestCase
 
 
