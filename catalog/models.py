@@ -64,7 +64,7 @@ class Publisher(models.Model):
         return self.name
 
 
-class Book(models.Model):
+class Work(models.Model):
     """Книга в библиотечном каталоге."""
     title = models.CharField(max_length=255, verbose_name='Название')
     original_title = models.CharField(max_length=255, verbose_name='Оригинальное название')
@@ -79,7 +79,7 @@ class Book(models.Model):
     description = models.TextField(blank=True, verbose_name='Описание')
 
     class Meta:
-        db_table = 'books'
+        db_table = 'works'
         verbose_name = 'Произведение'
         verbose_name_plural = 'Произведения'
         ordering = ['title']
@@ -90,8 +90,8 @@ class Book(models.Model):
 
 class BookEdition(models.Model):
     """Конкретное издание книги."""
-    book = models.ForeignKey(
-        Book, on_delete=models.CASCADE, related_name='editions', verbose_name='Произведение'
+    work = models.ForeignKey(
+        Work, on_delete=models.CASCADE, related_name='editions', verbose_name='Произведение'
     )
     title = models.CharField(max_length=255, verbose_name="Название перевода")
     isbn = models.CharField(
@@ -121,7 +121,7 @@ class BookEdition(models.Model):
     available_copies = models.PositiveIntegerField(default=1, verbose_name='Доступно экземпляров')
 
     class Meta:
-        db_table = 'book_editions'
+        db_table = 'editions'
         verbose_name = 'Изданная книга'
         verbose_name_plural = 'Изданные книги'
         ordering = ['title']

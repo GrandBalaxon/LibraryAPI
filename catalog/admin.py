@@ -2,7 +2,7 @@ from django.contrib import admin
 from django.db.models import Count, QuerySet
 from django.http import HttpRequest
 
-from catalog.models import Book, Author, Genre, Publisher, BookEdition
+from catalog.models import Work, Author, Genre, Publisher, BookEdition
 
 
 @admin.register(Author)
@@ -59,8 +59,8 @@ class PublisherAdmin(admin.ModelAdmin):
         return obj.editions_count
 
 
-@admin.register(Book)
-class BookAdmin(admin.ModelAdmin):
+@admin.register(Work)
+class WorkAdmin(admin.ModelAdmin):
     list_display = (
         'id',
         'title',
@@ -74,7 +74,7 @@ class BookAdmin(admin.ModelAdmin):
     search_fields = ('title', 'authors__last_name', 'authors__first_name', 'authors__pseudonym')
     filter_horizontal = ('authors', 'genres')
 
-    def get_queryset(self, request: HttpRequest) -> QuerySet[Book]:
+    def get_queryset(self, request: HttpRequest) -> QuerySet[Work]:
         queryset = super().get_queryset(request)
         return queryset.prefetch_related('authors', 'genres').annotate(editions_count=Count('editions'))
 
@@ -96,7 +96,7 @@ class BookEditionAdmin(admin.ModelAdmin):
     list_display = (
         'id',
         'title',
-        'book',
+        'work',
         'isbn',
         'publication_year',
         'language',
@@ -107,7 +107,7 @@ class BookEditionAdmin(admin.ModelAdmin):
     search_fields = (
         'title',
         'isbn',
-        'book__title',
+        'work__title',
         'publishers__name',
         'translators__last_name',
         'translators__first_name'

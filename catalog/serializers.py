@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from catalog.models import Author, Genre, Publisher, Book, BookEdition
+from catalog.models import Author, Genre, Publisher, Work, BookEdition
 
 
 class AuthorSerializer(serializers.ModelSerializer):
@@ -62,13 +62,13 @@ class PublisherSerializer(PublisherBriefSerializer):
         fields = PublisherBriefSerializer.Meta.fields + ['description']
 
 
-class BookBriefSerializer(serializers.ModelSerializer):
+class WorkBriefSerializer(serializers.ModelSerializer):
     """Краткая информация о произведении (базовый для полного)."""
     authors = AuthorBriefSerializer(many=True, read_only=True)
     genres = GenreSerializer(many=True, read_only=True)
 
     class Meta:
-        model = Book
+        model = Work
         fields = [
             'id',
             'title',
@@ -81,7 +81,7 @@ class BookBriefSerializer(serializers.ModelSerializer):
         ]
 
 
-class BookSerializer(BookBriefSerializer):
+class WorkSerializer(WorkBriefSerializer):
     """Полный сериализатор произведения с полями для записи связей."""
     author_ids = serializers.PrimaryKeyRelatedField(
         source='authors',
@@ -96,16 +96,16 @@ class BookSerializer(BookBriefSerializer):
         write_only=True
     )
 
-    class Meta(BookBriefSerializer.Meta):
-        fields = BookBriefSerializer.Meta.fields + ['author_ids', 'genre_ids']
+    class Meta(WorkBriefSerializer.Meta):
+        fields = WorkBriefSerializer.Meta.fields + ['author_ids', 'genre_ids']
 
 
 class BookEditionSerializer(serializers.ModelSerializer):
     """Сериализатор для конкретного издания произведения."""
-    book = BookBriefSerializer(read_only=True)
-    book_id = serializers.PrimaryKeyRelatedField(
-        source='book',
-        queryset=Book.objects.all(),
+    work = WorkBriefSerializer(read_only=True)
+    work_id = serializers.PrimaryKeyRelatedField(
+        source='work',
+        queryset=Work.objects.all(),
         write_only=True
     )
     publishers = PublisherBriefSerializer(read_only=True, many=True)

@@ -1,4 +1,4 @@
-from catalog.models import Book
+from catalog.models import Work
 from catalog.tests.base import BaseAPITestCase
 
 
@@ -8,7 +8,7 @@ class BookAPITest(BaseAPITestCase):
     def setUp(self):
         super().setUp()
         self.url = '/api/catalog/books/'
-        self.details_url = f"{self.url}{self.book.id}/"
+        self.details_url = f"{self.url}{self.work.id}/"
         self.data = {
             'title': 'Тестовое произведение',
             'original_title': "Test Work",
@@ -97,8 +97,8 @@ class BookAPITest(BaseAPITestCase):
         response = self.client.patch(self.details_url, data=patch_data, format='json')
         self.assertEqual(response.status_code, 200)
 
-        self.book.refresh_from_db()
-        self.assertEqual(self.book.title, 'Обновленное название')
+        self.work.refresh_from_db()
+        self.assertEqual(self.work.title, 'Обновленное название')
 
     def test_reader_cannot_update_book(self):
         """Читатель не может менять книгу."""
@@ -114,7 +114,7 @@ class BookAPITest(BaseAPITestCase):
         # Обрати внимание: у книг нет бизнес-логики запрета удаления (в отличие от авторов)
         response = self.client.delete(self.details_url)
         self.assertEqual(response.status_code, 204)
-        self.assertFalse(Book.objects.filter(id=self.book.id).exists())
+        self.assertFalse(Work.objects.filter(id=self.work.id).exists())
 
     def test_reader_cannot_delete_book(self):
         """Читатель не может удалять книгу."""

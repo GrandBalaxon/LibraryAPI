@@ -2,7 +2,7 @@ from datetime import date
 
 from rest_framework.test import APITestCase
 
-from catalog.models import Author, Genre, Publisher, Book, BookEdition
+from catalog.models import Author, Genre, Publisher, Work, BookEdition
 from users.models import CustomUser
 
 
@@ -85,7 +85,7 @@ class BaseAPITestCase(APITestCase):
         )
 
         # ---------- Произведения ----------
-        cls.book = Book.objects.create(
+        cls.work = Work.objects.create(
             title="1984",
             original_title="Nineteen Eighty-Four",
             original_language="Английский",
@@ -96,10 +96,10 @@ class BaseAPITestCase(APITestCase):
                 "следит за каждым."
             ),
         )
-        cls.book.authors.set([cls.author])
-        cls.book.genres.set([cls.genre])
+        cls.work.authors.set([cls.author])
+        cls.work.genres.set([cls.genre])
 
-        cls.book2 = Book.objects.create(
+        cls.work2 = Work.objects.create(
             title="Хоббит, или Туда и обратно",
             original_title="The Hobbit, or There and Back Again",
             original_language="Английский",
@@ -109,12 +109,12 @@ class BaseAPITestCase(APITestCase):
                 "волшебника Гэндальфа оказывается втянут в опасный поход."
             ),
         )
-        cls.book2.authors.set([cls.author2])
-        cls.book2.genres.set([cls.genre2, cls.genre3])
+        cls.work2.authors.set([cls.author2])
+        cls.work2.genres.set([cls.genre2, cls.genre3])
 
         # ---------- Издания ----------
         cls.edition = BookEdition.objects.create(
-            book=cls.book,
+            book=cls.work,
             title="1984",
             isbn="978-5-00155-298-7",
             publication_year=2020,
@@ -126,7 +126,7 @@ class BaseAPITestCase(APITestCase):
         cls.edition.translators.set([cls.translator])
 
         cls.edition2 = BookEdition.objects.create(
-            book=cls.book2,
+            book=cls.work2,
             title="Хоббит, или Туда и Обратно",
             isbn="978-5-17-081760-3",
             publication_year=2013,

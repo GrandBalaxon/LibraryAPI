@@ -4,8 +4,8 @@ from rest_framework.decorators import action
 from rest_framework.request import Request
 from rest_framework.response import Response
 
-from catalog.models import Author, Genre, Publisher, Book, BookEdition
-from catalog.serializers import AuthorSerializer, GenreSerializer, PublisherSerializer, BookSerializer, \
+from catalog.models import Author, Genre, Publisher, Work, BookEdition
+from catalog.serializers import AuthorSerializer, GenreSerializer, PublisherSerializer, WorkSerializer, \
     BookEditionSerializer, CopyCountSerializer
 from catalog.utils import standard_viewset_schema
 from users.permissions import IsLibrarianOrReadOnly
@@ -71,10 +71,10 @@ class PublisherViewSet(viewsets.ModelViewSet):
 
 
 @standard_viewset_schema(tags=['Произведения'])
-class BookViewSet(viewsets.ModelViewSet):
+class WorkViewSet(viewsets.ModelViewSet):
     """Вьюсет для работы с произведениями."""
-    queryset = Book.objects.all()
-    serializer_class = BookSerializer
+    queryset = Work.objects.all()
+    serializer_class = WorkSerializer
     permission_classes = [IsLibrarianOrReadOnly]
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = [
@@ -98,8 +98,8 @@ class BookEditionViewSet(viewsets.ModelViewSet):
     search_fields = [
         'title',
         'isbn',
-        'book__title',
-        'book__authors__last_name',
+        'work__title',
+        'work__authors__last_name',
         'publishers__name',
         'translators__last_name',
     ]
