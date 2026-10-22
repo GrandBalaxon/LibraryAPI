@@ -107,13 +107,13 @@ class EditionViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'])
     def add_copies(self, request: Request, pk: str | None = None) -> Response:
         edition: Edition = self.get_object()
-        count = int(request.data.get('count', 0))
 
-        if count <= 0:
-            return Response(
-                {'detail': 'Укажите положительное число'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+        # Валидация через сериализатор
+        serializer = CopyCountSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        count = serializer.validated_data['count']
 
         existing_count = edition.copies.count()
         base_identifier = edition.isbn or f'ED-{edition.id}'
@@ -126,4 +126,5 @@ class EditionViewSet(viewsets.ModelViewSet):
         # Массовое создание BookCopy объектов
         BookCopy.objects.bulk_create(copies)
 
+        edition.refresh_from_db()
         return Response(EditionSerializer(edition).data)
