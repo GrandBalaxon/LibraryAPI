@@ -4,9 +4,9 @@ from rest_framework.decorators import action
 from rest_framework.request import Request
 from rest_framework.response import Response
 
-from catalog.models import Author, Genre, Publisher, Work, BookEdition
+from catalog.models import Author, Genre, Publisher, Work, Edition, BookCopy
 from catalog.serializers import AuthorSerializer, GenreSerializer, PublisherSerializer, WorkSerializer, \
-    BookEditionSerializer, CopyCountSerializer
+    EditionSerializer, CopyCountSerializer
 from catalog.utils import standard_viewset_schema
 from users.permissions import IsLibrarianOrReadOnly
 
@@ -26,9 +26,8 @@ class AuthorViewSet(viewsets.ModelViewSet):
         author: Author = self.get_object()
 
         # Ищем издания книг этого автора, у которых есть копии (total_copies > 0)
-        has_copies = BookEdition.objects.filter(
-            book__authors=author,
-            total_copies__gt=0
+        has_copies = BookCopy.objects.filter(
+            edition__work__authors=author
         ).exists()
 
         if has_copies:
@@ -78,55 +77,53 @@ class WorkViewSet(viewsets.ModelViewSet):
     permission_classes = [IsLibrarianOrReadOnly]
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = [
-        'title',
         'original_title',
         'authors__last_name',
         'authors__first_name',
         'authors__pseudonym',
         'genres__name',
     ]
-    ordering_fields = ['title', 'writing_year', 'original_language']
+    ordering_fields = ['original_title', 'writing_year', 'original_language']
 
 
 @standard_viewset_schema(tags=['Книги'])
-class BookEditionViewSet(viewsets.ModelViewSet):
+class EditionViewSet(viewsets.ModelViewSet):
     """Вьюсет для работы с конкретными изданиями книг."""
-    queryset = BookEdition.objects.all()
-    serializer_class = BookEditionSerializer
+    queryset = Edition.objects.all()
+    serializer_class = EditionSerializer
     permission_classes = [IsLibrarianOrReadOnly]
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = [
         'title',
         'isbn',
-        'work__title',
+        'work__original_title',
         'work__authors__last_name',
         'publishers__name',
         'translators__last_name',
     ]
-    ordering_fields = ['title', 'publication_year', 'total_copies', 'available_copies']
+    ordering_fields = ['title', 'publication_year']
 
     @extend_schema(summary='Добавление копий книги', request=CopyCountSerializer)
     @action(detail=True, methods=['post'])
     def add_copies(self, request: Request, pk: str | None = None) -> Response:
-        edition: BookEdition = self.get_object()
+        edition: Edition = self.get_object()
         count = int(request.data.get('count', 0))
-        if count <= 0:
-            return Response({'detail': 'Укажите положительное число'}, status=400)
-        edition.total_copies += count
-        edition.available_copies += count
-        edition.save(update_fields=['total_copies', 'available_copies'])
-        return Response(BookEditionSerializer(edition).data)
 
-    @extend_schema(summary='Списание копий книги', request=CopyCountSerializer)
-    @action(detail=True, methods=['post'])
-    def remove_copies(self, request: Request, pk: str | None = None) -> Response:
-        edition: BookEdition = self.get_object()
-        count = int(request.data.get('count', 0))
         if count <= 0:
-            return Response({'detail': 'Укажите положительное число'}, status=400)
-        if count > edition.available_copies:
-            return Response({'detail': 'Нельзя списать больше доступных копий'}, status=400)
-        edition.total_copies -= count
-        edition.available_copies -= count
-        edition.save(update_fields=['total_copies', 'available_copies'])
-        return Response(BookEditionSerializer(edition).data)
+            return Response(
+                {'detail': 'Укажите положительное число'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        existing_count = edition.copies.count()
+        base_identifier = edition.isbn or f'ED-{edition.id}'
+
+        copies =[]
+        for i in range(count):
+            inv_number = f'{base_identifier}-{existing_count + i + 1}'
+            copies.append(BookCopy(edition=edition, inventory_number=inv_number))
+
+        # Массовое создание BookCopy объектов
+        BookCopy.objects.bulk_create(copies)
+
+        return Response(EditionSerializer(edition).data)
