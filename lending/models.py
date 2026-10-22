@@ -1,7 +1,7 @@
 from django.db import models
 from django.utils import timezone
 
-from catalog.models import BookEdition
+from catalog.models import BookCopy
 from config import settings
 
 
@@ -19,7 +19,7 @@ class BookLoan(models.Model):
         verbose_name='Читатель'
     )
     book = models.ForeignKey(
-        BookEdition,
+        BookCopy,
         on_delete=models.CASCADE,
         related_name='loans',
         verbose_name='Книга'
