@@ -14,15 +14,15 @@ class BookLoan(models.Model):
 
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
-        on_delete=models.CASCADE,
+        on_delete=models.PROTECT,
         related_name='loans',
         verbose_name='Читатель'
     )
-    book = models.ForeignKey(
+    book_copy = models.ForeignKey(
         BookCopy,
-        on_delete=models.CASCADE,
+        on_delete=models.PROTECT,
         related_name='loans',
-        verbose_name='Книга'
+        verbose_name='Экземпляр книги'
     )
     borrowed_at = models.DateTimeField(
         auto_now_add=True,
@@ -57,4 +57,4 @@ class BookLoan(models.Model):
         ordering = ['-borrowed_at']
 
     def __str__(self) -> str:
-        return f'{self.user} — {self.book} ({self.get_status_display()})'
+        return f'{self.user} — {self.book_copy} ({self.get_status_display()})'
