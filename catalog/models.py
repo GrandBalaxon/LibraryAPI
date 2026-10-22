@@ -81,10 +81,10 @@ class Work(models.Model):
         db_table = 'works'
         verbose_name = 'Произведение'
         verbose_name_plural = 'Произведения'
-        ordering = ['title']
+        ordering = ['original_title']
 
     def __str__(self) -> str:
-        return self.title
+        return self.original_title
 
 
 class Edition(models.Model):
