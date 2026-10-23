@@ -14,7 +14,7 @@ class AuthorAdmin(admin.ModelAdmin):
     def get_queryset(self, request: HttpRequest) -> QuerySet[Author]:
         queryset = super().get_queryset(request)
         return queryset.annotate(
-            works_count=Count('works', distinct=True), # books -> works
+            works_count=Count('works', distinct=True),
             translations_count=Count('translations', distinct=True)
         )
 
@@ -38,7 +38,7 @@ class GenreAdmin(admin.ModelAdmin):
 
     def get_queryset(self, request: HttpRequest) -> QuerySet[Genre]:
         queryset = super().get_queryset(request)
-        return queryset.annotate(works_count=Count('works')) # books -> works
+        return queryset.annotate(works_count=Count('works'))
 
     @admin.display(description='Количество произведений', ordering='works_count')
     def works_count(self, obj) -> int:
