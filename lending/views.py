@@ -10,6 +10,7 @@ from rest_framework.decorators import action
 from rest_framework.request import Request
 from rest_framework.response import Response
 
+from catalog.models import BookCopy
 from catalog.utils import standard_viewset_schema
 from lending.models import BookLoan
 from lending.serializers import BookLoanSerializer
@@ -22,8 +23,8 @@ from users.permissions import IsLibrarianOrReadOnly
     return_book=extend_schema(
         summary='Вернуть книгу',
         description=(
-                'Отмечает выдачу как возвращённую, увеличивает количество доступных экземпляров книги'
-                ' на 1 и фиксирует дату возврата.'
+                'Отмечает выдачу как возвращённую, меняет статус конкретного экземпляра книги'
+                ' на "Доступна" и фиксирует дату возврата.'
         ),
         request=None
     )
@@ -33,38 +34,54 @@ class BookLoanViewSet(viewsets.ModelViewSet):
     queryset: QuerySet[BookLoan] = BookLoan.objects.all()
     serializer_class = BookLoanSerializer
     permission_classes = [IsLibrarianOrReadOnly]
+
     filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
-    filterset_fields = ['user', 'status', 'book']
+    filterset_fields = ['user', 'status', 'book_copy']
     ordering_fields = ['borrowed_at', 'due_date', 'status']
     ordering = ['-borrowed_at']
 
     def get_queryset(self) -> QuerySet[BookLoan]:
+        # Оптимизация запросов (N+1)
+        queryset = super().get_queryset().select_related(
+            'user',
+            'book_copy',
+            'book_copy__edition',
+            'book_copy__edition__work'
+        )
         user: CustomUser | Any = self.request.user
 
-        if user.role == 'librarian':
-            return super().get_queryset()
-        return super().get_queryset().filter(user=user)
+        if user.is_authenticated and user.role == CustomUser.Role.LIBRARIAN:
+            return queryset
+        if user.is_authenticated:
+            return queryset.filter(user=user)
+        return queryset.none()
 
     @action(methods=['post'], detail=True, url_path='return')
     def return_book(self, request: Request, pk: str | None = None) -> Response:
-        loan = self.get_object()
+        loan: BookLoan = self.get_object()
 
         if loan.status == BookLoan.Status.RETURNED:
             return Response(
                 {'detail': 'Книга уже возвращена.'},
                 status=status.HTTP_400_BAD_REQUEST
             )
+
         with transaction.atomic():
             loan = BookLoan.objects.select_for_update().get(pk=loan.pk)
+
             if loan.status == BookLoan.Status.RETURNED:
                 return Response(
                     {'detail': 'Книга уже возвращена.'},
                     status=status.HTTP_400_BAD_REQUEST
                 )
+
+            book_copy = BookCopy.objects.select_for_update().get(pk=loan.book_copy_id)
+
             loan.status = BookLoan.Status.RETURNED
             loan.returned_at = timezone.now()
             loan.save(update_fields=['status', 'returned_at'])
-            loan.book.available_copies += 1
-            loan.book.save(update_fields=['available_copies'])
+
+            book_copy.status = BookCopy.Status.AVAILABLE
+            book_copy.save(update_fields=['status'])
 
         return Response(BookLoanSerializer(loan).data)
