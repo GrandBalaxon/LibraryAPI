@@ -9,7 +9,7 @@ router.register(r'authors', AuthorViewSet)
 router.register(r'genres', GenreViewSet)
 router.register(r'publishers', PublisherViewSet)
 router.register(r'works', WorkViewSet)
-router.register(r'editions', EditionViewSet)
-router.register(r'copies', BookCopyViewSet)
+router.register(r'editions', EditionViewSet, basename='edition')
+router.register(r'copies', BookCopyViewSet, basename='bookcopy')
 
 urlpatterns = router.urls
