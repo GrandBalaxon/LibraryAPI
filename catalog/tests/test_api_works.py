@@ -70,7 +70,6 @@ class WorkAPITest(BaseAPITestCase):
         detail_response = self.client.get(f"{self.url}{created_id}/")
         data = detail_response.json()
 
-        # ИСПРАВЛЕНО: title -> original_title
         self.assertEqual(data['original_title'], 'Test Work')
 
         # Проверяем, что связи M2M установились
