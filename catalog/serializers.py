@@ -1,12 +1,12 @@
 from rest_framework import serializers
 
-from catalog.models import Author, Genre, Publisher, Book, BookEdition
+from catalog.models import Author, Genre, Publisher, Work, Edition, BookCopy
 
 
 class AuthorSerializer(serializers.ModelSerializer):
     """Сериализатор для авторов."""
-    books_written = serializers.SerializerMethodField()
-    books_translated = serializers.SerializerMethodField()
+    works_written = serializers.SerializerMethodField()
+    works_translated = serializers.SerializerMethodField()
 
     class Meta:
         model = Author
@@ -19,17 +19,17 @@ class AuthorSerializer(serializers.ModelSerializer):
             'full_name',
             'pseudonym',
             'biography',
-            'books_written',
-            'books_translated',
+            'works_written',
+            'works_translated',
         ]
         read_only_fields = ['full_name']
 
-    def get_books_written(self, obj) -> int:
-        if hasattr(obj, 'book_count'):
-            return obj.book_count
-        return obj.books.count()
+    def get_works_written(self, obj) -> int:
+        if hasattr(obj, 'works_count'):
+            return obj.works_count
+        return obj.works.count()
 
-    def get_books_translated(self, obj) -> int:
+    def get_works_translated(self, obj) -> int:
         if hasattr(obj, 'translations_count'):
             return obj.translations_count
         return obj.translations.count()
@@ -62,16 +62,15 @@ class PublisherSerializer(PublisherBriefSerializer):
         fields = PublisherBriefSerializer.Meta.fields + ['description']
 
 
-class BookBriefSerializer(serializers.ModelSerializer):
-    """Краткая информация о произведении (базовый для полного)."""
+class WorkBriefSerializer(serializers.ModelSerializer):
+    """Краткая информация о произведении."""
     authors = AuthorBriefSerializer(many=True, read_only=True)
     genres = GenreSerializer(many=True, read_only=True)
 
     class Meta:
-        model = Book
+        model = Work
         fields = [
             'id',
-            'title',
             'original_title',
             'original_language',
             'writing_year',
@@ -81,7 +80,7 @@ class BookBriefSerializer(serializers.ModelSerializer):
         ]
 
 
-class BookSerializer(BookBriefSerializer):
+class WorkSerializer(WorkBriefSerializer):
     """Полный сериализатор произведения с полями для записи связей."""
     author_ids = serializers.PrimaryKeyRelatedField(
         source='authors',
@@ -96,16 +95,23 @@ class BookSerializer(BookBriefSerializer):
         write_only=True
     )
 
-    class Meta(BookBriefSerializer.Meta):
-        fields = BookBriefSerializer.Meta.fields + ['author_ids', 'genre_ids']
+    class Meta(WorkBriefSerializer.Meta):
+        fields = WorkBriefSerializer.Meta.fields + ['author_ids', 'genre_ids']
 
 
-class BookEditionSerializer(serializers.ModelSerializer):
+class BookCopyBriefSerializer(serializers.ModelSerializer):
+    """Краткая информация об экземпляре (для вложения в Edition)."""
+    class Meta:
+        model = BookCopy
+        fields = ['id', 'inventory_number', 'status', 'condition', 'location']
+
+
+class EditionSerializer(serializers.ModelSerializer):
     """Сериализатор для конкретного издания произведения."""
-    book = BookBriefSerializer(read_only=True)
-    book_id = serializers.PrimaryKeyRelatedField(
-        source='book',
-        queryset=Book.objects.all(),
+    work = WorkBriefSerializer(read_only=True)
+    work_id = serializers.PrimaryKeyRelatedField(
+        source='work',
+        queryset=Work.objects.all(),
         write_only=True
     )
     publishers = PublisherBriefSerializer(read_only=True, many=True)
@@ -122,15 +128,17 @@ class BookEditionSerializer(serializers.ModelSerializer):
         write_only=True,
         many=True
     )
-    available_copies = serializers.IntegerField(read_only=True)
+    copies = BookCopyBriefSerializer(many=True, read_only=True)
+    copies_count = serializers.IntegerField(source='copies.count', read_only=True)
+    available_copies_count = serializers.SerializerMethodField()
 
     class Meta:
-        model = BookEdition
+        model = Edition
         fields = [
             'id',
+            'work',
+            'work_id',
             'title',
-            'book',
-            'book_id',
             'isbn',
             'publishers',
             'publisher_ids',
@@ -138,14 +146,35 @@ class BookEditionSerializer(serializers.ModelSerializer):
             'language',
             'translators',
             'translator_ids',
-            'total_copies',
-            'available_copies',
+            'pages',
+            'copies',
+            'copies_count',
+            'available_copies_count',
         ]
 
-    def clean(self, validated_data):
-        # Устанавливаем доступные копии равными общему количеству при создании
-        validated_data['available_copies'] = validated_data.get('total_copies')
-        return super().create(validated_data)
+    def get_available_copies_count(self, obj) -> int:
+        """Подсчёт экземпляров, у которых статус AVAILABLE."""
+        return obj.copies.filter(status=BookCopy.Status.AVAILABLE).count()
+
+
+class BookCopySerializer(serializers.ModelSerializer):
+    """Сериализатор для управления конкретными экземплярами книг."""
+    edition_title = serializers.CharField(source='edition.title', read_only=True)
+    work_title = serializers.CharField(source='edition.work.original_title', read_only=True)
+
+    class Meta:
+        model = BookCopy
+        fields = [
+            'id',
+            'edition',
+            'edition_title',
+            'work_title',
+            'inventory_number',
+            'status',
+            'condition',
+            'location',
+            'notes',
+        ]
 
 
 class CopyCountSerializer(serializers.Serializer):

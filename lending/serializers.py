@@ -5,14 +5,22 @@ from django.db import transaction
 from django.utils import timezone
 from rest_framework import serializers
 
-from catalog.models import BookEdition
+from catalog.models import BookCopy
+from catalog.serializers import BookCopyBriefSerializer
 from lending.models import BookLoan
 from users.models import CustomUser
 
 
 class BookLoanSerializer(serializers.ModelSerializer):
     """Сериализатор выдачи книги."""
-    book = serializers.PrimaryKeyRelatedField(queryset=BookEdition.objects.all())
+    # Для чтения (GET) отдаем вложенный объект (с инвентарным номером)
+    book_copy = BookCopyBriefSerializer(read_only=True)
+
+    # Для записи (POST) принимаем ID экземпляра
+    book_copy_id = serializers.PrimaryKeyRelatedField(
+        source='book_copy', queryset=BookCopy.objects.all(), write_only=True
+    )
+
     user_id = serializers.PrimaryKeyRelatedField(
         source='user', queryset=CustomUser.objects.all(), write_only=True
     )
@@ -27,7 +35,8 @@ class BookLoanSerializer(serializers.ModelSerializer):
             'id',
             'user_id',
             'user',
-            'book',
+            'book_copy',
+            'book_copy_id',
             'borrowed_at',
             'due_date',
             'loan_period_days',
@@ -38,9 +47,11 @@ class BookLoanSerializer(serializers.ModelSerializer):
         read_only_fields = ['borrowed_at', 'returned_at', 'status', 'is_overdue']
 
     def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
-        book: BookEdition = attrs.get('book')
-        if book.available_copies <= 0:
-            raise serializers.ValidationError("Нет доступных экземпляров этого издания.")
+        book_copy: BookCopy = attrs.get('book_copy')
+        if book_copy and book_copy.status != BookCopy.Status.AVAILABLE:
+            raise serializers.ValidationError(
+                {"book_copy_id": "Данный экземпляр не доступен к выдаче."}
+            )
         return attrs
 
     def create(self, validated_data: dict[str, Any]) -> BookLoan:
@@ -48,38 +59,26 @@ class BookLoanSerializer(serializers.ModelSerializer):
         due_date = validated_data.get('due_date')
 
         with transaction.atomic():
-            book: BookEdition = validated_data['book']
-            # Блокируем для атомарности операции
-            book = BookEdition.objects.select_for_update().get(pk=book.pk)
-            if book.available_copies <= 0:
-                raise serializers.ValidationError("Нет доступных экземпляров этого издания.")
+            book_copy: BookCopy = validated_data['book_copy']
 
-            # Уменьшаем количество доступных экземпляров
-            book.available_copies -= 1
-            book.save(update_fields=['available_copies'])
+            # Блокируем для атомарности операции
+            book_copy = BookCopy.objects.select_for_update().get(pk=book_copy.pk)
+
+            if not book_copy.status == BookCopy.Status.AVAILABLE:
+                raise serializers.ValidationError(
+                    {"book_copy_id": "Данный экземпляр не доступен к выдаче."}
+                )
+
+            # Меняем статус экземпляра
+            book_copy.status = BookCopy.Status.BORROWED
+            book_copy.save(update_fields=['status'])
 
             # Расчет ожидаемой даты возврата книги
             if not due_date:
                 due_date = timezone.localdate() + timedelta(days=loan_period_days)
             validated_data['due_date'] = due_date
             validated_data['loan_period_days'] = loan_period_days
-
             validated_data['status'] = BookLoan.Status.ACTIVE
 
             instance: BookLoan = super().create(validated_data)
             return instance
-
-    def update(self, instance: BookLoan, validated_data: dict[str, Any]) -> BookLoan:
-        # Обрабатываем только случай возврата (меняем статус на RETURNED)
-        with transaction.atomic():
-            old_status = instance.status
-            new_status = validated_data.get('status', old_status)
-
-            if old_status != BookLoan.Status.RETURNED and new_status == BookLoan.Status.RETURNED:
-                book = BookEdition.objects.select_for_update().get(pk=instance.book_id)
-                book.available_copies += 1
-                book.save(update_fields=['available_copies'])
-                validated_data['returned_at'] = validated_data.get('returned_at') or timezone.now()
-
-            updated_instance: BookLoan = super().update(instance, validated_data)
-            return updated_instance

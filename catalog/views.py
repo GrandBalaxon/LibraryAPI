@@ -1,12 +1,15 @@
+from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import extend_schema
 from rest_framework import viewsets, filters, status
 from rest_framework.decorators import action
 from rest_framework.request import Request
 from rest_framework.response import Response
 
-from catalog.models import Author, Genre, Publisher, Book, BookEdition
-from catalog.serializers import AuthorSerializer, GenreSerializer, PublisherSerializer, BookSerializer, \
-    BookEditionSerializer, CopyCountSerializer
+from catalog.models import Author, Genre, Publisher, Work, Edition, BookCopy
+from catalog.serializers import (
+    AuthorSerializer, GenreSerializer, PublisherSerializer,
+    WorkSerializer, EditionSerializer, CopyCountSerializer, BookCopySerializer
+)
 from catalog.utils import standard_viewset_schema
 from users.permissions import IsLibrarianOrReadOnly
 
@@ -25,10 +28,9 @@ class AuthorViewSet(viewsets.ModelViewSet):
         """Запрещаем удаление автора, если в библиотеке есть экземпляры его книг."""
         author: Author = self.get_object()
 
-        # Ищем издания книг этого автора, у которых есть копии (total_copies > 0)
-        has_copies = BookEdition.objects.filter(
-            book__authors=author,
-            total_copies__gt=0
+        # Проверяем, есть ли физические экземпляры произведений этого автора
+        has_copies = BookCopy.objects.filter(
+            edition__work__authors=author
         ).exists()
 
         if has_copies:
@@ -60,8 +62,8 @@ class PublisherViewSet(viewsets.ModelViewSet):
     search_fields = ['name']
 
     def destroy(self, request, *args, **kwargs):
+        """Запрещаем удаление издательства, если у него есть выпущенные издания."""
         publisher = self.get_object()
-        # Проверяем, есть ли у издательства изданные книги в библиотеке
         if publisher.editions.exists():
             return Response(
                 {'detail': 'Нельзя удалить издательство, так как у него есть изданные книги.'},
@@ -71,62 +73,99 @@ class PublisherViewSet(viewsets.ModelViewSet):
 
 
 @standard_viewset_schema(tags=['Произведения'])
-class BookViewSet(viewsets.ModelViewSet):
+class WorkViewSet(viewsets.ModelViewSet):
     """Вьюсет для работы с произведениями."""
-    queryset = Book.objects.all()
-    serializer_class = BookSerializer
+    queryset = Work.objects.prefetch_related('authors', 'genres').all()
+    serializer_class = WorkSerializer
     permission_classes = [IsLibrarianOrReadOnly]
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = [
-        'title',
         'original_title',
         'authors__last_name',
         'authors__first_name',
         'authors__pseudonym',
         'genres__name',
     ]
-    ordering_fields = ['title', 'writing_year', 'original_language']
+    ordering_fields = ['original_title', 'writing_year', 'original_language']
 
 
-@standard_viewset_schema(tags=['Книги'])
-class BookEditionViewSet(viewsets.ModelViewSet):
+@standard_viewset_schema(tags=['Издания'])
+class EditionViewSet(viewsets.ModelViewSet):
     """Вьюсет для работы с конкретными изданиями книг."""
-    queryset = BookEdition.objects.all()
-    serializer_class = BookEditionSerializer
+    serializer_class = EditionSerializer
     permission_classes = [IsLibrarianOrReadOnly]
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = [
         'title',
         'isbn',
-        'book__title',
-        'book__authors__last_name',
+        'work__original_title',
+        'work__authors__last_name',
         'publishers__name',
         'translators__last_name',
     ]
-    ordering_fields = ['title', 'publication_year', 'total_copies', 'available_copies']
+    ordering_fields = ['title', 'publication_year']
 
-    @extend_schema(summary='Добавление копий книги', request=CopyCountSerializer)
+    def get_queryset(self):
+        return Edition.objects.select_related('work').prefetch_related(
+            'work__authors', 'work__genres', 'publishers', 'translators', 'copies'
+        ).all()
+
+    @extend_schema(summary='Добавление экземпляров издания', request=CopyCountSerializer)
     @action(detail=True, methods=['post'])
     def add_copies(self, request: Request, pk: str | None = None) -> Response:
-        edition: BookEdition = self.get_object()
-        count = int(request.data.get('count', 0))
-        if count <= 0:
-            return Response({'detail': 'Укажите положительное число'}, status=400)
-        edition.total_copies += count
-        edition.available_copies += count
-        edition.save(update_fields=['total_copies', 'available_copies'])
-        return Response(BookEditionSerializer(edition).data)
+        edition: Edition = self.get_object()
 
-    @extend_schema(summary='Списание копий книги', request=CopyCountSerializer)
-    @action(detail=True, methods=['post'])
-    def remove_copies(self, request: Request, pk: str | None = None) -> Response:
-        edition: BookEdition = self.get_object()
-        count = int(request.data.get('count', 0))
-        if count <= 0:
-            return Response({'detail': 'Укажите положительное число'}, status=400)
-        if count > edition.available_copies:
-            return Response({'detail': 'Нельзя списать больше доступных копий'}, status=400)
-        edition.total_copies -= count
-        edition.available_copies -= count
-        edition.save(update_fields=['total_copies', 'available_copies'])
-        return Response(BookEditionSerializer(edition).data)
+        serializer = CopyCountSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        count = serializer.validated_data['count']
+        existing_count = edition.copies.count()
+        base_identifier = edition.isbn or f'ED-{edition.id}'
+
+        copies = []
+        for i in range(count):
+            inv_number = f'{base_identifier}-{existing_count + i + 1}'
+            copies.append(BookCopy(edition=edition, inventory_number=inv_number))
+
+        BookCopy.objects.bulk_create(copies)
+
+        edition.refresh_from_db()
+        return Response(EditionSerializer(edition).data)
+
+
+@standard_viewset_schema(tags=['Экземпляры книг'])
+class BookCopyViewSet(viewsets.ModelViewSet):
+    """Вьюсет для работы с индивидуальными копиями книг в библиотеке."""
+    serializer_class = BookCopySerializer
+    permission_classes = [IsLibrarianOrReadOnly]
+
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filterset_fields = ['status', 'condition', 'edition']
+
+    search_fields = [
+        'edition__title',
+        'edition__isbn',
+        'inventory_number',
+        'edition__work__original_title',
+        'edition__work__authors__last_name',
+    ]
+    ordering_fields = ['inventory_number', 'status']
+
+    def get_queryset(self):
+        # Оптимизация N+1
+        return BookCopy.objects.select_related('edition', 'edition__work').all()
+
+    def destroy(self, request, *args, **kwargs):
+        """Вместо физического удаления помечаем книгу как списанную."""
+        instance = self.get_object()
+
+        if instance.status == BookCopy.Status.BORROWED:
+            return Response(
+                {'detail': 'Нельзя списать книгу, которая выдана читателю.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        instance.status = BookCopy.Status.WRITTEN_OFF
+        instance.save(update_fields=['status'])
+        return Response(status=status.HTTP_204_NO_CONTENT)

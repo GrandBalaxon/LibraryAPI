@@ -7,31 +7,38 @@ from django.forms.models import ModelForm
 from django.http import HttpRequest
 from django.utils import timezone
 
-from catalog.models import BookEdition
+from catalog.models import BookCopy
 from lending.models import BookLoan
 
 
 @admin.register(BookLoan)
 class BookLoanAdmin(admin.ModelAdmin):
-    list_display = ('id', 'book', 'user', 'status', 'borrowed_at', 'is_overdue')
+    list_display = ('id', 'book_copy', 'user', 'status', 'borrowed_at', 'is_overdue')
     list_filter = ('status',)
-    search_fields = ('user__email', 'user__first_name', 'user__last_name', 'book__title', 'book__book__title')
+    search_fields = ('user__email', 'user__first_name', 'user__last_name', 'book_copy__edition__title',
+                     'book_copy__edition__work__original_title', 'book_copy__inventory_number')
     date_hierarchy = 'borrowed_at'
-    autocomplete_fields = ['user', 'book']
+    autocomplete_fields = ['user', 'book_copy']
+
+    # Кастомные действия
+    actions = ['return_books']
 
     def get_readonly_fields(self, request: HttpRequest, obj: BookLoan | None = None) -> tuple[str, ...]:
-        readonly_fields = ('borrowed_at', 'returned_at', 'status', 'loan_period_days')
+        readonly_fields = ('borrowed_at', 'returned_at', 'loan_period_days')
         # если объект уже создан
         if obj:
-            readonly_fields += ('user', 'book')
+            readonly_fields += ('user', 'book_copy')
             if obj.status == BookLoan.Status.RETURNED:
-                return readonly_fields + ('due_date',)
+                # Если книга уже возвращена, запрещаем менять статус обратно и менять due_date
+                return readonly_fields + ('status', 'due_date',)
+            # Если книга на руках, статус можно поменять на "Возвращена"
             return readonly_fields
         else:
-            return readonly_fields
+            # При создании статус менять нельзя, он ставится автоматически
+            return readonly_fields + ('status',)
 
     def save_model(self, request: HttpRequest, obj: BookLoan, form: ModelForm, change: bool) -> None:
-        """При создании уменьшаем available_copies у издания, при возврате увеличиваем."""
+        """При создании меняем статус копии книги на BORROWED (Выдана), при возврате на AVAILABLE (Доступна)."""
 
         # если новая запись выдачи книги
         if not change:
@@ -40,12 +47,13 @@ class BookLoanAdmin(admin.ModelAdmin):
                 due_date = obj.due_date
 
                 with transaction.atomic():
-                    book = BookEdition.objects.select_for_update().get(pk=obj.book_id)
-                    if book.available_copies <= 0:
-                        raise ValidationError("Нет доступных экземпляров")
+                    book_copy: BookCopy = BookCopy.objects.select_for_update().get(pk=obj.book_copy_id)
 
-                    book.available_copies -= 1
-                    book.save(update_fields=['available_copies'])
+                    if not book_copy.status == BookCopy.Status.AVAILABLE:
+                        raise ValidationError("Данный экземпляр не доступен к выдаче.")
+
+                    book_copy.status = BookCopy.Status.BORROWED
+                    book_copy.save(update_fields=['status'])
 
                     # Расчет ожидаемой даты возврата книги
                     if not due_date:
@@ -59,11 +67,30 @@ class BookLoanAdmin(admin.ModelAdmin):
         else:
             # Проверяем, меняется ли статус на RETURNED
             old_obj = BookLoan.objects.get(pk=obj.pk)
-            if old_obj.status != BookLoan.Status.RETURNED and obj.status == BookLoan.Status.RETURNED:
+
+            # Если статус изменился с ACTIVE на RETURNED
+            if old_obj.status == BookLoan.Status.ACTIVE and obj.status == BookLoan.Status.RETURNED:
                 with transaction.atomic():
-                    book = BookEdition.objects.select_for_update().get(pk=obj.book_id)
-                    book.available_copies += 1
-                    book.save(update_fields=['available_copies'])
+                    book_copy: BookCopy = BookCopy.objects.select_for_update().get(pk=obj.book_copy_id)
+                    book_copy.status = BookCopy.Status.AVAILABLE
+                    book_copy.save(update_fields=['status'])
                     obj.returned_at = obj.returned_at or timezone.now()
 
         super().save_model(request, obj, form, change)
+
+    @admin.action(description='Вернуть выбранные книги')
+    def return_books(self, request: HttpRequest, queryset) -> None:
+        """Массовый возврат книг через админку."""
+        updated_count = 0
+        for loan in queryset.filter(status=BookLoan.Status.ACTIVE):
+            with transaction.atomic():
+                book_copy = BookCopy.objects.select_for_update().get(pk=loan.book_copy_id)
+                book_copy.status = BookCopy.Status.AVAILABLE
+                book_copy.save(update_fields=['status'])
+
+                loan.status = BookLoan.Status.RETURNED
+                loan.returned_at = timezone.now()
+                loan.save(update_fields=['status', 'returned_at'])
+                updated_count += 1
+
+        self.message_user(request, f'Успешно возвращено книг: {updated_count}', level=messages.SUCCESS)

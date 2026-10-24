@@ -56,7 +56,7 @@ class AuthorAPITest(BaseAPITestCase):
         self.assertEqual(author_data['last_name'], 'Тестовый')
         self.assertEqual(author_data['first_name'], 'Тест')
         self.assertEqual(author_data['pseudonym'], None)
-        self.assertEqual(author_data['books_written'], 0)
+        self.assertEqual(author_data['works_written'], 0)
 
     def test_reader_cannot_add_new_author(self):
         """Читатель не может добавить нового автора."""

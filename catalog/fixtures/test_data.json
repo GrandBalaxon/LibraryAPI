@@ -99,10 +99,9 @@
     }
 },
 {
-    "model": "catalog.book",
+    "model": "catalog.work",
     "pk": 1,
     "fields": {
-        "title": "1984",
         "original_title": "Nineteen Eighty-Four",
         "original_language": "Английский",
         "writing_year": 1948,
@@ -117,10 +116,9 @@
     }
 },
 {
-    "model": "catalog.book",
+    "model": "catalog.work",
     "pk": 2,
     "fields": {
-        "title": "Хоббит, или Туда и обратно",
         "original_title": "The Hobbit, or There and Back Again",
         "original_language": "Английский",
         "writing_year": 1937,
@@ -136,16 +134,15 @@
     }
 },
 {
-    "model": "catalog.bookedition",
+    "model": "catalog.edition",
     "pk": 1,
     "fields": {
-        "book": 1,
+        "work": 1,
         "title": "1984",
         "isbn": "978-5-00155-298-7",
         "publication_year": 2020,
         "language": "Русский",
-        "total_copies": 6,
-        "available_copies": 6,
+        "pages": 320,
         "publishers": [
             1
         ],
@@ -155,22 +152,105 @@
     }
 },
 {
-    "model": "catalog.bookedition",
+    "model": "catalog.edition",
     "pk": 2,
     "fields": {
-        "book": 2,
+        "work": 2,
         "title": "Хоббит, или Туда и Обратно",
         "isbn": "978-5-17-081760-3",
         "publication_year": 2013,
         "language": "Русский",
-        "total_copies": 1,
-        "available_copies": 0,
+        "pages": 400,
         "publishers": [
             2
         ],
         "translators": [
             4
         ]
+    }
+},
+{
+    "model": "catalog.bookcopy",
+    "pk": 1,
+    "fields": {
+        "edition": 1,
+        "inventory_number": "978-5-00155-298-7-1",
+        "status": "available",
+        "condition": "new",
+        "location": "Зал 1, стеллаж 1",
+        "notes": ""
+    }
+},
+{
+    "model": "catalog.bookcopy",
+    "pk": 2,
+    "fields": {
+        "edition": 1,
+        "inventory_number": "978-5-00155-298-7-2",
+        "status": "available",
+        "condition": "new",
+        "location": "Зал 1, стеллаж 1",
+        "notes": ""
+    }
+},
+{
+    "model": "catalog.bookcopy",
+    "pk": 3,
+    "fields": {
+        "edition": 1,
+        "inventory_number": "978-5-00155-298-7-3",
+        "status": "available",
+        "condition": "good",
+        "location": "Зал 1, стеллаж 1",
+        "notes": ""
+    }
+},
+{
+    "model": "catalog.bookcopy",
+    "pk": 4,
+    "fields": {
+        "edition": 1,
+        "inventory_number": "978-5-00155-298-7-4",
+        "status": "available",
+        "condition": "good",
+        "location": "Зал 1, стеллаж 1",
+        "notes": ""
+    }
+},
+{
+    "model": "catalog.bookcopy",
+    "pk": 5,
+    "fields": {
+        "edition": 1,
+        "inventory_number": "978-5-00155-298-7-5",
+        "status": "available",
+        "condition": "good",
+        "location": "Зал 1, стеллаж 1",
+        "notes": ""
+    }
+},
+{
+    "model": "catalog.bookcopy",
+    "pk": 6,
+    "fields": {
+        "edition": 1,
+        "inventory_number": "978-5-00155-298-7-6",
+        "status": "available",
+        "condition": "worn",
+        "location": "Зал 1, стеллаж 1",
+        "notes": "Немного потрепан корешок"
+    }
+},
+{
+    "model": "catalog.bookcopy",
+    "pk": 7,
+    "fields": {
+        "edition": 2,
+        "inventory_number": "978-5-17-081760-3-1",
+        "status": "borrowed",
+        "condition": "new",
+        "location": "Зал 2, стеллаж 3",
+        "notes": ""
     }
 },
 {
@@ -241,7 +321,7 @@
     "pk": 1,
     "fields": {
         "user": 2,
-        "book": 1,
+        "book_copy": 1,
         "borrowed_at": "2026-08-23T12:13:45.817Z",
         "loan_period_days": 30,
         "due_date": "2026-09-23",
@@ -254,10 +334,10 @@
     "pk": 2,
     "fields": {
         "user": 3,
-        "book": 2,
+        "book_copy": 7,
         "borrowed_at": "2026-08-23T20:53:32.172Z",
         "loan_period_days": 33,
-        "due_date": "2026-09-25T20:53:32.172Z",
+        "due_date": "2026-09-25",
         "returned_at": null,
         "status": "active"
     }

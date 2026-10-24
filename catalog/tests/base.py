@@ -2,7 +2,7 @@ from datetime import date
 
 from rest_framework.test import APITestCase
 
-from catalog.models import Author, Genre, Publisher, Book, BookEdition
+from catalog.models import Author, Genre, Publisher, Work, Edition, BookCopy
 from users.models import CustomUser
 
 
@@ -51,7 +51,6 @@ class BaseAPITestCase(APITestCase):
             biography="Российский переводчик, кандидат филологических наук, доцент, автор переводов.",
         )
 
-        # Второй автор / переводчик — для тестов на множественные связи
         cls.author2 = Author.objects.create(
             first_name="Джон",
             last_name="Толкин",
@@ -84,9 +83,8 @@ class BaseAPITestCase(APITestCase):
             description="",
         )
 
-        # ---------- Произведения ----------
-        cls.book = Book.objects.create(
-            title="1984",
+        # ---------- Произведения (Work) ----------
+        cls.work = Work.objects.create(
             original_title="Nineteen Eighty-Four",
             original_language="Английский",
             writing_year=1948,
@@ -96,11 +94,10 @@ class BaseAPITestCase(APITestCase):
                 "следит за каждым."
             ),
         )
-        cls.book.authors.set([cls.author])
-        cls.book.genres.set([cls.genre])
+        cls.work.authors.set([cls.author])
+        cls.work.genres.set([cls.genre])
 
-        cls.book2 = Book.objects.create(
-            title="Хоббит, или Туда и обратно",
+        cls.work2 = Work.objects.create(
             original_title="The Hobbit, or There and Back Again",
             original_language="Английский",
             writing_year=1937,
@@ -109,36 +106,50 @@ class BaseAPITestCase(APITestCase):
                 "волшебника Гэндальфа оказывается втянут в опасный поход."
             ),
         )
-        cls.book2.authors.set([cls.author2])
-        cls.book2.genres.set([cls.genre2, cls.genre3])
+        cls.work2.authors.set([cls.author2])
+        cls.work2.genres.set([cls.genre2, cls.genre3])
 
-        # ---------- Издания ----------
-        cls.edition = BookEdition.objects.create(
-            book=cls.book,
+        # ---------- Издания (Edition) ----------
+        cls.edition = Edition.objects.create(
+            work=cls.work,
             title="1984",
             isbn="978-5-00155-298-7",
             publication_year=2020,
             language="Русский",
-            total_copies=6,
-            available_copies=6,
+            pages=320,
         )
         cls.edition.publishers.set([cls.publisher])
         cls.edition.translators.set([cls.translator])
 
-        cls.edition2 = BookEdition.objects.create(
-            book=cls.book2,
+        cls.edition2 = Edition.objects.create(
+            work=cls.work2,
             title="Хоббит, или Туда и Обратно",
             isbn="978-5-17-081760-3",
             publication_year=2013,
             language="Русский",
-            total_copies=1,
-            available_copies=0,
+            pages=400,
         )
         cls.edition2.publishers.set([cls.publisher2])
         cls.edition2.translators.set([cls.translator2])
 
-    # ---------- Хелперы: аутентификация ----------
+        # ---------- Экземпляры (BookCopy) ----------
+        cls.copy1 = BookCopy.objects.create(
+            edition=cls.edition,
+            inventory_number="978-5-00155-298-7-1",
+            status=BookCopy.Status.AVAILABLE
+        )
+        cls.copy2 = BookCopy.objects.create(
+            edition=cls.edition,
+            inventory_number="978-5-00155-298-7-2",
+            status=BookCopy.Status.AVAILABLE
+        )
+        cls.copy_hobbit = BookCopy.objects.create(
+            edition=cls.edition2,
+            inventory_number="978-5-17-081760-3-1",
+            status=BookCopy.Status.BORROWED
+        )
 
+    # ---------- Хелперы: аутентификация ----------
     def login_reader(self) -> None:
         """Аутентифицировать клиент как читателя."""
         self.client.force_authenticate(self.user_reader)
@@ -152,16 +163,12 @@ class BaseAPITestCase(APITestCase):
         self.client.force_authenticate(None)
 
     # ---------- Хелперы: данные ----------
-
-    def set_available_copies(self, edition: BookEdition, count: int) -> BookEdition:
+    def set_copy_status(self, copy: BookCopy, status: str) -> BookCopy:
         """
-        Установить edition.available_copies = count.
-
-        Полезно для тестов remove_copies: между тестами значения
-        откатываются транзакцией, но внутри одного теста объект из
-        setUpTestData нужно перезаписать вручную.
+        Установить статус экземпляра книги.
+        Полезно для тестов, где нужно подготовить книгу к выдаче или списанию.
         """
-        edition.available_copies = count
-        edition.save(update_fields=["available_copies"])
-        edition.refresh_from_db()
-        return edition
+        copy.status = status
+        copy.save(update_fields=["status"])
+        copy.refresh_from_db()
+        return copy
