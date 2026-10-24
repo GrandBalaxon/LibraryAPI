@@ -1,4 +1,5 @@
 from rest_framework import serializers
+from stdnum import isbn
 
 from catalog.models import Author, Genre, Publisher, Work, Edition, BookCopy
 
@@ -155,6 +156,20 @@ class EditionSerializer(serializers.ModelSerializer):
     def get_available_copies_count(self, obj) -> int:
         """Подсчёт экземпляров, у которых статус AVAILABLE."""
         return obj.copies.filter(status=BookCopy.Status.AVAILABLE).count()
+
+    def validate_isbn(self, value):
+        """Валидация ISBN на уровне API."""
+        if not value:
+            return value
+        try:
+            # Валидируем и получаем компактный вид
+            compact_isbn = isbn.validate(value)
+            # Форматируем: приводим к ISBN-13 и добавляем правильные дефисы
+            return isbn.format(compact_isbn, convert=True)
+        except (isbn.InvalidLength, isbn.InvalidChecksum):
+            raise serializers.ValidationError('Некорректный формат или контрольная сумма ISBN.')
+        except Exception:
+            raise serializers.ValidationError('Некорректный ISBN')
 
 
 class BookCopySerializer(serializers.ModelSerializer):
