@@ -1,6 +1,7 @@
 from django.core.exceptions import ValidationError
 from django.db import models
-from stdnum import isbn
+
+from catalog.validators import validate_isbn
 
 
 class Author(models.Model):
@@ -134,14 +135,10 @@ class Edition(models.Model):
         super().clean()
         if self.isbn:
             try:
-                # Валидируем и получаем компактный вид
-                compact_isbn = isbn.validate(self.isbn)
-                # Форматируем: приводим к ISBN-13 и добавляем правильные дефисы
-                self.isbn = isbn.format(compact_isbn, convert=True)
-            except (isbn.InvalidLength, isbn.InvalidChecksum):
-                raise ValidationError({'isbn': 'Некорректный формат или контрольная сумма ISBN.'})
-            except Exception:
-                raise ValidationError({'isbn': 'Некорректный ISBN'})
+                self.isbn = validate_isbn(self.isbn)
+            except ValidationError as exc:
+                # Оборачиваем под ключ поля, чтобы в админке/формах ошибка встала напротив input'а isbn
+                raise ValidationError({'isbn': exc.messages}) from exc
 
 
 class BookCopy(models.Model):

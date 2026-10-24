@@ -1,8 +1,7 @@
 from rest_framework import serializers
-from stdnum import isbn
-from stdnum.exceptions import InvalidLength, InvalidChecksum, InvalidFormat, InvalidComponent
 
 from catalog.models import Author, Genre, Publisher, Work, Edition, BookCopy
+from catalog.validators import validate_isbn as isbn_validator
 
 
 class AuthorSerializer(serializers.ModelSerializer):
@@ -164,33 +163,8 @@ class EditionSerializer(serializers.ModelSerializer):
         return obj.copies.filter(status=BookCopy.Status.AVAILABLE).count()
 
     def validate_isbn(self, value: str | None) -> str | None:
-        """Валидация ISBN на уровне API."""
-        if not value:
-            return value
-
-        try:
-            # Валидируем и получаем компактный вид
-            compact_isbn = isbn.validate(value)
-            # Форматируем: приводим к ISBN-13 и добавляем правильные дефисы
-            return isbn.format(compact_isbn, convert=True)
-
-        except InvalidLength:
-            raise serializers.ValidationError("Неверная длина ISBN. ISBN должен состоять из 10 или 13 цифр.")
-        except InvalidChecksum:
-            raise serializers.ValidationError(
-                "Неверный ISBN. Последняя цифра (контрольная сумма) "
-                "не совпадает с остальными. Проверьте введенные данные."
-            )
-        except InvalidFormat:
-            raise serializers.ValidationError(
-                "Неверный формат ISBN. Разрешены только цифры, дефисы и пробелы. "
-                "Убедитесь, что нет лишних букв или символов."
-            )
-        except InvalidComponent:
-            raise serializers.ValidationError(
-                "Некорректная составная часть ISBN. "
-                "Проверьте правильность префикса (например, 978 или 979) и региона."
-            )
+        """Валидация и форматирование ISBN на уровне API."""
+        return isbn_validator(value)
 
 
 class BookCopySerializer(serializers.ModelSerializer):
