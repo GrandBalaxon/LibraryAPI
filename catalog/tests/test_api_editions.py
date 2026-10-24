@@ -174,3 +174,92 @@ class EditionAPITest(BaseAPITestCase):
         url = f"{self.details_url}add_copies/"
         response = self.client.post(url, data={'count': 1}, format='json')
         self.assertEqual(response.status_code, 403)
+
+    # --- Проверка валидации ISBN ---
+
+    def test_create_edition_with_invalid_isbn_invalid_length_error(self):
+        """API должно отклонять создание издания с невалидным ISBN (ошибка InvalidLength)."""
+        self.login_librarian()
+
+        # Берем наши обычные данные, но ломаем ISBN
+        bad_data = self.data.copy()
+        bad_data['isbn'] = "12345"
+
+        response = self.client.post(self.url, data=bad_data, format='json')
+
+        # Ожидаем 400 Bad Request
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('isbn', response.json())
+        self.assertIn(
+            "Неверная длина ISBN. ISBN должен состоять из 10 или 13 цифр.",
+            str(response.json()['isbn'])
+        )
+
+    def test_create_edition_with_invalid_isbn_invalid_checksum_error(self):
+        """API должно отклонять создание издания с неверной контрольной суммой ISBN."""
+        self.login_librarian()
+
+        bad_data = self.data.copy()
+        # Длина правильная (13 цифр), формат правильный, но последняя цифра не сходится (должна быть 0)
+        bad_data['isbn'] = "9783161484101"
+
+        response = self.client.post(self.url, data=bad_data, format='json')
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('isbn', response.json())
+        self.assertIn(
+            "Неверный ISBN. Последняя цифра (контрольная сумма) "
+            "не совпадает с остальными. Проверьте введенные данные.",
+            str(response.json()['isbn'])
+        )
+
+    def test_create_edition_with_invalid_isbn_invalid_format_error(self):
+        """API должно отклонять создание издания с недопустимыми символами в ISBN."""
+        self.login_librarian()
+
+        bad_data = self.data.copy()
+        # Используем буквы, которые stdnum не может распознать
+        bad_data['isbn'] = "978-ABC-148410-0"
+
+        response = self.client.post(self.url, data=bad_data, format='json')
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('isbn', response.json())
+        self.assertIn(
+            "Неверный формат ISBN. Разрешены только цифры, дефисы и пробелы. "
+            "Убедитесь, что нет лишних букв или символов.",
+            str(response.json()['isbn'])
+        )
+
+    def test_create_edition_with_invalid_isbn_invalid_component_error(self):
+        """API должно отклонять создание издания с неверным префиксом ISBN."""
+        self.login_librarian()
+
+        bad_data = self.data.copy()
+        # Валидный EAN-13 (контрольная сумма сходится), но префикс 123 не является ISBN (должно быть 978 или 979)
+        bad_data['isbn'] = "1234567890128"
+
+        response = self.client.post(self.url, data=bad_data, format='json')
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('isbn', response.json())
+        self.assertIn(
+            "Некорректная составная часть ISBN. "
+            "Проверьте правильность префикса (например, 978 или 979) и региона.",
+            str(response.json()['isbn'])
+        )
+
+    def test_create_edition_with_valid_isbn_formats_it(self):
+        """API должно принимать валидный ISBN и сохранять его с дефисами."""
+        self.login_librarian()
+
+        # Отправляем валидный ISBN без дефисов
+        good_data = self.data.copy()
+        good_data['isbn'] = "9783161484100"
+
+        response = self.client.post(self.url, data=good_data, format='json')
+
+        self.assertEqual(response.status_code, 201)
+
+        # Проверяем, что в БД он сохранился красиво (с дефисами)
+        self.assertEqual(response.json()['isbn'], "978-3-16-148410-0")

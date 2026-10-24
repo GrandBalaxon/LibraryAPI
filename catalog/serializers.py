@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from stdnum import isbn
+from stdnum.exceptions import InvalidLength, InvalidChecksum, InvalidFormat, InvalidComponent
 
 from catalog.models import Author, Genre, Publisher, Work, Edition, BookCopy
 
@@ -38,6 +39,7 @@ class AuthorSerializer(serializers.ModelSerializer):
 
 class AuthorBriefSerializer(serializers.ModelSerializer):
     """Краткая информация об авторе для вложенных объектов."""
+
     class Meta:
         model = Author
         fields = ['id', 'full_name', 'pseudonym']
@@ -45,6 +47,7 @@ class AuthorBriefSerializer(serializers.ModelSerializer):
 
 class GenreSerializer(serializers.ModelSerializer):
     """Сериализатор для жанров."""
+
     class Meta:
         model = Genre
         fields = ['id', 'name']
@@ -52,6 +55,7 @@ class GenreSerializer(serializers.ModelSerializer):
 
 class PublisherBriefSerializer(serializers.ModelSerializer):
     """Сериализатор для издательств без описания."""
+
     class Meta:
         model = Publisher
         fields = ['id', 'name']
@@ -59,6 +63,7 @@ class PublisherBriefSerializer(serializers.ModelSerializer):
 
 class PublisherSerializer(PublisherBriefSerializer):
     """Полный сериализатор для издательства (с описанием)."""
+
     class Meta(PublisherBriefSerializer.Meta):
         fields = PublisherBriefSerializer.Meta.fields + ['description']
 
@@ -102,6 +107,7 @@ class WorkSerializer(WorkBriefSerializer):
 
 class BookCopyBriefSerializer(serializers.ModelSerializer):
     """Краткая информация об экземпляре (для вложения в Edition)."""
+
     class Meta:
         model = BookCopy
         fields = ['id', 'inventory_number', 'status', 'condition', 'location']
@@ -157,19 +163,34 @@ class EditionSerializer(serializers.ModelSerializer):
         """Подсчёт экземпляров, у которых статус AVAILABLE."""
         return obj.copies.filter(status=BookCopy.Status.AVAILABLE).count()
 
-    def validate_isbn(self, value):
+    def validate_isbn(self, value: str | None) -> str | None:
         """Валидация ISBN на уровне API."""
         if not value:
             return value
+
         try:
             # Валидируем и получаем компактный вид
             compact_isbn = isbn.validate(value)
             # Форматируем: приводим к ISBN-13 и добавляем правильные дефисы
             return isbn.format(compact_isbn, convert=True)
-        except (isbn.InvalidLength, isbn.InvalidChecksum):
-            raise serializers.ValidationError('Некорректный формат или контрольная сумма ISBN.')
-        except Exception:
-            raise serializers.ValidationError('Некорректный ISBN')
+
+        except InvalidLength:
+            raise serializers.ValidationError("Неверная длина ISBN. ISBN должен состоять из 10 или 13 цифр.")
+        except InvalidChecksum:
+            raise serializers.ValidationError(
+                "Неверный ISBN. Последняя цифра (контрольная сумма) "
+                "не совпадает с остальными. Проверьте введенные данные."
+            )
+        except InvalidFormat:
+            raise serializers.ValidationError(
+                "Неверный формат ISBN. Разрешены только цифры, дефисы и пробелы. "
+                "Убедитесь, что нет лишних букв или символов."
+            )
+        except InvalidComponent:
+            raise serializers.ValidationError(
+                "Некорректная составная часть ISBN. "
+                "Проверьте правильность префикса (например, 978 или 979) и региона."
+            )
 
 
 class BookCopySerializer(serializers.ModelSerializer):
