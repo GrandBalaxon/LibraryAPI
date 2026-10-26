@@ -192,6 +192,46 @@ class EditionAPITest(BaseAPITestCase):
         self.assertEqual(response.json()['isbn'][0],
                          'Нельзя изменить ISBN, так как на обложках экземпляров напечатан старый номер.')
 
+    def test_librarian_can_delete_edition_without_copies(self):
+        """Библиотекарь может физически удалить издание, если у него нет ни одной копии."""
+        self.login_librarian()
+
+        # 1. Создаем новое издание через API
+        create_response = self.client.post(self.url, data=self.data, format='json')
+        self.assertEqual(create_response.status_code, 201)
+
+        created_id = create_response.json()['id']
+        created_details_url = f"{self.url}{created_id}/"
+
+        # 2. Удаляем его
+        response = self.client.delete(created_details_url)
+
+        # Проверяем, что удаление прошло успешно (204)
+        self.assertEqual(response.status_code, 204)
+
+        # Проверяем, что его физически нет в БД
+        self.assertFalse(Edition.objects.filter(id=created_id).exists())
+
+    def test_librarian_can_archive_edition_with_written_off_copies(self):
+        """Библиотекарь может архивировать издание, если все его копии списаны."""
+        self.login_librarian()
+
+        # 1. Списываем все копии у издания
+        self.edition.copies.update(status=BookCopy.Status.WRITTEN_OFF)
+
+        # 2. Вызываем удаление (которое должно превратиться в архивацию)
+        response = self.client.delete(self.details_url)
+
+        # 3. Проверяем успешный ответ (204 No Content)
+        self.assertEqual(response.status_code, 204)
+
+        # 4. Проверяем, что издание НЕ удалено физически из БД
+        self.assertTrue(Edition.objects.filter(id=self.edition.id).exists())
+
+        # 5. Проверяем, что его статус изменился на "В архиве"
+        self.edition.refresh_from_db()
+        self.assertEqual(self.edition.status, Edition.Status.ARCHIVED)
+
     # --- Поиск и Сортировка ---
 
     def test_search_edition_by_isbn(self):
