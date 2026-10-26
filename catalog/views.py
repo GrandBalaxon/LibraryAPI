@@ -198,7 +198,15 @@ class BookCopyViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         # Оптимизация N+1
-        return BookCopy.objects.select_related('edition', 'edition__work').all()
+        queryset = BookCopy.objects.select_related('edition', 'edition__work')
+        user: CustomUser | AnonymousUser = self.request.user
+
+        # Библиотекарь видит все экземпляры
+        if user.is_authenticated and user.role == CustomUser.Role.LIBRARIAN:
+            return queryset
+
+        # Читатели и анонимы видят только доступные экземпляры
+        return queryset.filter(status=BookCopy.Status.AVAILABLE)
 
     def destroy(self, request, *args, **kwargs):
         """Вместо физического удаления помечаем книгу как списанную."""
