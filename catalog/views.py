@@ -1,3 +1,7 @@
+from typing import Any
+
+from django.contrib.auth.models import AnonymousUser
+from django.db.models import QuerySet
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import extend_schema
 from rest_framework import viewsets, filters, status
@@ -11,6 +15,7 @@ from catalog.serializers import (
     WorkSerializer, EditionSerializer, CopyCountSerializer, BookCopySerializer
 )
 from catalog.utils import standard_viewset_schema
+from users.models import CustomUser
 from users.permissions import IsLibrarianOrReadOnly
 
 
@@ -117,12 +122,20 @@ class EditionViewSet(viewsets.ModelViewSet):
     ordering_fields = ['title', 'publication_year']
     filterset_fields = ['status']
 
-    def get_queryset(self):
-        return Edition.objects.select_related('work').prefetch_related(
+    def get_queryset(self) -> QuerySet[Edition]:
+        queryset = Edition.objects.select_related('work').prefetch_related(
             'work__authors', 'work__genres', 'publishers', 'translators', 'copies'
-        ).all()
+        )
+        user: CustomUser | AnonymousUser = self.request.user
 
-    def destroy(self, request, *args, **kwargs):
+        # Если пользователь — библиотекарь, он видит всё (и активные, и архивные издания)
+        if user.is_authenticated and user.role == CustomUser.Role.LIBRARIAN:
+            return queryset
+
+        # Иначе скрываем архивированные издания
+        return queryset.filter(status=Edition.Status.ACTIVE)
+
+    def destroy(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         """Удаление пустого издания или архивация издания со списанными копиями."""
         edition: Edition = self.get_object()
 
@@ -140,7 +153,6 @@ class EditionViewSet(viewsets.ModelViewSet):
         edition.status = Edition.Status.ARCHIVED
         edition.save(update_fields=['status'])
         return Response(status=status.HTTP_204_NO_CONTENT)
-
 
     @extend_schema(summary='Добавление экземпляров издания', request=CopyCountSerializer)
     @action(detail=True, methods=['post'])
