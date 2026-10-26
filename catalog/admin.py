@@ -107,9 +107,10 @@ class EditionAdmin(admin.ModelAdmin):
         'isbn',
         'publication_year',
         'language',
+        'status',
         'copies_count',
     )
-    list_filter = ('publishers', 'language', 'publication_year')
+    list_filter = ('status', 'publishers', 'language', 'publication_year')
     search_fields = (
         'title',
         'isbn',

@@ -104,7 +104,8 @@ class EditionViewSet(viewsets.ModelViewSet):
     """Вьюсет для работы с конкретными изданиями книг."""
     serializer_class = EditionSerializer
     permission_classes = [IsLibrarianOrReadOnly]
-    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
+    filter_backends = [filters.SearchFilter, filters.OrderingFilter, DjangoFilterBackend]
+
     search_fields = [
         'title',
         'isbn',
@@ -114,6 +115,7 @@ class EditionViewSet(viewsets.ModelViewSet):
         'translators__last_name',
     ]
     ordering_fields = ['title', 'publication_year']
+    filterset_fields = ['status']
 
     def get_queryset(self):
         return Edition.objects.select_related('work').prefetch_related(
