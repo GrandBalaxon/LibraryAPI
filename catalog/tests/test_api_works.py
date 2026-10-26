@@ -108,12 +108,42 @@ class WorkAPITest(BaseAPITestCase):
 
     # --- Удаление ---
 
-    def test_librarian_can_delete_work(self):
-        """Библиотекарь может удалить произведение."""
+    def test_librarian_cannot_delete_work_with_existing_editions(self):
+        """Библиотекарь НЕ может удалить произведение, если у него есть издания."""
         self.login_librarian()
         response = self.client.delete(self.details_url)
-        self.assertEqual(response.status_code, 204)
-        self.assertFalse(Work.objects.filter(id=self.work.id).exists())
+
+        # 1. Проверяем статус-код, должно быть 400 BAD REQUEST
+        self.assertEqual(response.status_code, 400)
+
+        # 2. Проверяем текст ошибки
+        self.assertEqual(
+            response.json()['detail'],
+            'Нельзя удалить произведение, так как у него есть издания (в том числе архивные).'
+        )
+
+        # 3. Проверяем, что запись осталась в БД
+        self.assertTrue(Work.objects.filter(id=self.work.id).exists())
+
+    def test_librarian_can_delete_work_without_editions(self):
+        """Библиотекарь МОЖЕТ удалить произведение через API, если у него нет изданий."""
+        self.login_librarian()
+
+        # 1. Создаем новое произведение
+        create_response = self.client.post(self.url, data=self.data, format='json')
+        self.assertEqual(create_response.status_code, 201)
+
+        created_work_id = create_response.json()['id']
+        created_details_url = f"{self.url}{created_work_id}/"
+
+        # 2. Пытаемся удалить только что созданное произведение
+        delete_response = self.client.delete(created_details_url)
+
+        # 3. Проверяем, что удаление прошло успешно (204 No Content)
+        self.assertEqual(delete_response.status_code, 204)
+
+        # 4. Проверяем, что запись физически удалена из БД
+        self.assertFalse(Work.objects.filter(id=created_work_id).exists())
 
     def test_reader_cannot_delete_work(self):
         """Читатель не может удалять произведение."""

@@ -92,15 +92,22 @@ class EditionAPITest(BaseAPITestCase):
         self.edition.refresh_from_db()
         self.assertEqual(self.edition.pages, 400)
 
-    def test_librarian_can_delete_edition(self):
-        """Библиотекарь может удалить издание."""
+    def test_librarian_cannot_delete_or_archive_edition_with_active_copies(self):
+        """Библиотекарь НЕ может удалить или архивировать издание, если у него есть не списанные копии."""
         self.login_librarian()
         response = self.client.delete(self.details_url)
-        self.assertEqual(response.status_code, 204)
-        self.assertFalse(Edition.objects.filter(id=self.edition.id).exists())
 
-        # При удалении Edition каскадно удаляются и все его BookCopy
-        self.assertFalse(BookCopy.objects.filter(edition_id=self.edition.id).exists())
+        # 1. Проверяем статус-код, должно быть 400 BAD REQUEST
+        self.assertEqual(response.status_code, 400)
+
+        # 2. Проверяем текст ошибки
+        self.assertEqual(
+            response.json()['detail'],
+            'Нельзя удалить или архивировать издание, пока в библиотеке есть его не списанные экземпляры.'
+        )
+
+        # 3. Проверяем, что запись осталась в БД
+        self.assertTrue(Edition.objects.filter(id=self.edition.id).exists())
 
     # --- Поиск и Сортировка ---
 
