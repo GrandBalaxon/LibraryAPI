@@ -50,7 +50,7 @@ class BookLoanSerializer(serializers.ModelSerializer):
         book_copy: BookCopy = attrs.get('book_copy')
         if book_copy and book_copy.status != BookCopy.Status.AVAILABLE:
             raise serializers.ValidationError(
-                {"book_copy_id": "Данный экземпляр не доступен к выдаче."}
+                {"book_copy_id": ["Данный экземпляр не доступен к выдаче."]}
             )
         return attrs
 
