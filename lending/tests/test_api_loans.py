@@ -125,6 +125,32 @@ class BookLoanAPITest(BaseAPITestCase):
         response = self.client.post(self.url, data=self.data, format='json')
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
+    @patch('lending.serializers.BookCopy.objects.select_for_update')
+    def test_create_loan_race_condition(self, mock_select_for_update):
+        """Покрываем защиту от Race Condition (вторую проверку внутри create)."""
+        self.login_librarian()
+
+        # 1. Настраиваем мок: говорим, что select_for_update вернет "занятую" копию
+        # (хотя в базе self.copy1 сейчас AVAILABLE, мы имитируем, что кто-то успел его взять)
+        fake_borrowed_copy = BookCopy(
+            id=self.copy1.id,
+            status=BookCopy.Status.BORROWED,
+            edition=self.edition,
+            inventory_number="fake-inv"
+        )
+        mock_select_for_update.return_value.get.return_value = fake_borrowed_copy
+
+        # 2. Отправляем запрос на выдачу
+        response = self.client.post(self.url, data=self.data, format='json')
+
+        # 3. Ожидаем 400, так как вторая проверка (под блокировкой) поймала, что книга занята
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('book_copy_id', response.json())
+        self.assertEqual(
+            response.json()['book_copy_id'][0],
+            "Данный экземпляр не доступен к выдаче."
+        )
+
     # --- Возврат (Action: return_book) ---
 
     def test_librarian_can_return_book(self):

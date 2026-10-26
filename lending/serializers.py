@@ -66,7 +66,7 @@ class BookLoanSerializer(serializers.ModelSerializer):
 
             if not book_copy.status == BookCopy.Status.AVAILABLE:
                 raise serializers.ValidationError(
-                    {"book_copy_id": "Данный экземпляр не доступен к выдаче."}
+                    {"book_copy_id": ["Данный экземпляр не доступен к выдаче."]}
                 )
 
             # Меняем статус экземпляра
