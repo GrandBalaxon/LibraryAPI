@@ -56,6 +56,51 @@ class EditionAPITest(BaseAPITestCase):
         response = self.client.get(self.url)
         self.assertIn(response.status_code, (401, 403))
 
+    def test_reader_cannot_see_archived_editions(self):
+        """Читатель не должен видеть архивные издания в общем списке."""
+        self.login_reader()
+
+        # Архивируем издание
+        self.edition.status = Edition.Status.ARCHIVED
+        self.edition.save(update_fields=['status'])
+
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 200)
+
+        # Проверяем, что "1984" (архивное) пропало из выдачи
+        data = response.json()
+        self.assertFalse(any(ed['isbn'] == '978-5-00155-298-7' for ed in data))
+
+    def test_librarian_can_see_archived_editions(self):
+        """Библиотекарь видит архивные издания."""
+        self.login_librarian()
+
+        self.edition.status = Edition.Status.ARCHIVED
+        self.edition.save(update_fields=['status'])
+
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 200)
+
+        # Проверяем, что "1984" (архивное) осталось в выдаче для библиотекаря
+        data = response.json()
+        self.assertTrue(any(ed['isbn'] == '978-5-00155-298-7' for ed in data))
+
+    def test_librarian_can_filter_editions_by_status(self):
+        """Библиотекарь может фильтровать издания по статусу."""
+        self.login_librarian()
+
+        # Архивируем издание
+        self.edition.status = Edition.Status.ARCHIVED
+        self.edition.save(update_fields=['status'])
+
+        # Ищем только архивные
+        response = self.client.get(self.url, {'status': 'archived'})
+        self.assertEqual(response.status_code, 200)
+
+        data = response.json()
+        self.assertEqual(len(data), 1)
+        self.assertEqual(data[0]['isbn'], '978-5-00155-298-7')
+
     # --- Создание ---
 
     def test_librarian_can_add_new_edition(self):
@@ -73,6 +118,19 @@ class EditionAPITest(BaseAPITestCase):
         self.assertEqual(data['work']['id'], self.work.id)
         self.assertEqual(data['publishers'][0]['id'], self.publisher.id)
         self.assertEqual(data['copies_count'], 0)
+
+    def test_create_edition_with_invalid_pages_and_year(self):
+        """API должно отклонять издание с 0 страниц или годом 0."""
+        self.login_librarian()
+
+        bad_data = self.data.copy()
+        bad_data['pages'] = 0
+        bad_data['publication_year'] = 0
+
+        response = self.client.post(self.url, data=bad_data, format='json')
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('pages', response.json())
+        self.assertIn('publication_year', response.json())
 
     def test_reader_cannot_add_new_edition(self):
         """Читатель не может добавить издание."""
@@ -270,3 +328,21 @@ class EditionAPITest(BaseAPITestCase):
 
         # Проверяем, что в БД он сохранился красиво (с дефисами)
         self.assertEqual(response.json()['isbn'], "978-3-16-148410-0")
+
+    def test_librarian_can_create_edition_without_isbn(self):
+        """Библиотекарь может создать издание без ISBN."""
+        self.login_librarian()
+
+        # Копируем данные и удаляем ISBN
+        data_without_isbn = self.data.copy()
+        data_without_isbn['isbn'] = None
+
+        response = self.client.post(self.url, data=data_without_isbn, format='json')
+
+        # Проверяем успешное создание
+        self.assertEqual(response.status_code, 201)
+
+        data = response.json()
+        # Проверяем, что ISBN остался пустым
+        self.assertIsNone(data['isbn'])
+        self.assertEqual(data['title'], 'Новое издание 1984')
