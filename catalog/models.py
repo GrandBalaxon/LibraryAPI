@@ -94,7 +94,7 @@ class Edition(models.Model):
     объединяющий экземпляры с одинаковым ISBN и годом выпуска.
     """
     work = models.ForeignKey(
-        Work, on_delete=models.CASCADE, related_name='editions', verbose_name='Произведение'
+        Work, on_delete=models.PROTECT, related_name='editions', verbose_name='Произведение'
     )
     title = models.CharField(max_length=255, verbose_name="Название перевода")
     isbn = models.CharField(
@@ -160,7 +160,7 @@ class BookCopy(models.Model):
 
     edition = models.ForeignKey(
         Edition,
-        on_delete=models.CASCADE,
+        on_delete=models.PROTECT,
         related_name='copies',
         verbose_name='Издание'
     )
