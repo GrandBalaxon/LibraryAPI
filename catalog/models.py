@@ -1,4 +1,5 @@
 from django.core.exceptions import ValidationError
+from django.core.validators import MinValueValidator
 from django.db import models
 
 from catalog.validators import validate_isbn
@@ -115,6 +116,7 @@ class Edition(models.Model):
         verbose_name='Издательства'
     )
     publication_year = models.PositiveIntegerField(
+        validators=[MinValueValidator(1)],
         verbose_name='Год издания'
     )
     language = models.CharField(max_length=50, verbose_name='Язык')
@@ -124,7 +126,10 @@ class Edition(models.Model):
         related_name='translations',
         verbose_name='Авторы перевода'
     )
-    pages = models.PositiveIntegerField(verbose_name='Количество страниц')
+    pages = models.PositiveIntegerField(
+        validators=[MinValueValidator(1)],
+        verbose_name='Количество страниц'
+    )
     status = models.CharField(
         max_length=20,
         choices=Status.choices,
