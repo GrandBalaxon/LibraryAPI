@@ -93,6 +93,10 @@ class Edition(models.Model):
     Конкретный выпуск (публикация) произведения в определенном издательстве,
     объединяющий экземпляры с одинаковым ISBN и годом выпуска.
     """
+    class Status(models.TextChoices):
+        ACTIVE = 'active', 'Активно'
+        ARCHIVED = 'archived', 'В архиве'
+
     work = models.ForeignKey(
         Work, on_delete=models.PROTECT, related_name='editions', verbose_name='Произведение'
     )
@@ -121,6 +125,12 @@ class Edition(models.Model):
         verbose_name='Авторы перевода'
     )
     pages = models.PositiveIntegerField(verbose_name='Количество страниц')
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.ACTIVE,
+        verbose_name='Статус'
+    )
 
     class Meta:
         db_table = 'editions'
@@ -130,6 +140,14 @@ class Edition(models.Model):
 
     def __str__(self) -> str:
         return f'{self.title} ({self.publication_year})'
+
+    def can_be_archived(self) -> bool:
+        """
+        Проверка возможности архивирования издания:
+        * Если все экземпляры списаны (или их вообще нет) — вернёт True.
+        * Если хотя бы один экземпляр не списан — вернёт False.
+        """
+        return not self.copies.exclude(status=BookCopy.Status.WRITTEN_OFF).exists()
 
     def clean(self) -> None:
         super().clean()
