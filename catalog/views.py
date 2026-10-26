@@ -88,6 +88,16 @@ class WorkViewSet(viewsets.ModelViewSet):
     ]
     ordering_fields = ['original_title', 'writing_year', 'original_language']
 
+    def destroy(self, request, *args, **kwargs):
+        """Запрещаем удаление произведения, если у него есть издания."""
+        work: Work = self.get_object()
+        if work.editions.exists():
+            return Response(
+                {'detail': 'Нельзя удалить произведение, так как у него есть издания (в том числе архивные).'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        return super().destroy(request, *args, **kwargs)
+
 
 @standard_viewset_schema(tags=['Издания'])
 class EditionViewSet(viewsets.ModelViewSet):
@@ -109,6 +119,26 @@ class EditionViewSet(viewsets.ModelViewSet):
         return Edition.objects.select_related('work').prefetch_related(
             'work__authors', 'work__genres', 'publishers', 'translators', 'copies'
         ).all()
+
+    def destroy(self, request, *args, **kwargs):
+        """Удаление пустого издания или архивация издания со списанными копиями."""
+        edition: Edition = self.get_object()
+
+        # 1. Если есть не списанные копии — ошибка
+        if not edition.can_be_archived():
+            return Response(
+                {'detail': 'Нельзя архивировать издание, пока в библиотеке есть его не списанные экземпляры.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        # 2. Если копий вообще никогда не было — удаляем физически
+        elif not edition.copies.exists():
+            return super().destroy(request, *args, **kwargs)
+
+        # 3. Если копии есть, но все списаны — отправляем в архив
+        edition.status = Edition.Status.ARCHIVED
+        edition.save(update_fields=['status'])
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
 
     @extend_schema(summary='Добавление экземпляров издания', request=CopyCountSerializer)
     @action(detail=True, methods=['post'])
