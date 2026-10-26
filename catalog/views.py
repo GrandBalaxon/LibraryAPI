@@ -1,7 +1,7 @@
 from typing import Any
 
 from django.contrib.auth.models import AnonymousUser
-from django.db.models import QuerySet
+from django.db.models import QuerySet, Count
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import extend_schema
 from rest_framework import viewsets, filters, status
@@ -28,6 +28,12 @@ class AuthorViewSet(viewsets.ModelViewSet):
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ['first_name', 'last_name', 'middle_name', 'pseudonym']
     ordering_fields = ['last_name', 'first_name', 'birth_date']
+
+    def get_queryset(self) -> QuerySet[Author]:
+        return Author.objects.annotate(
+            works_count=Count('works', distinct=True),
+            translations_count=Count('translations', distinct=True)
+        )
 
     def destroy(self, request: Request, *args, **kwargs) -> Response:
         """Запрещаем удаление автора, если в библиотеке есть экземпляры его книг."""
