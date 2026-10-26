@@ -167,6 +167,31 @@ class EditionAPITest(BaseAPITestCase):
         # 3. Проверяем, что запись осталась в БД
         self.assertTrue(Edition.objects.filter(id=self.edition.id).exists())
 
+    def test_librarian_cannot_change_work_if_copies_exist(self):
+        """Нельзя изменить произведение, если у издания есть физические копии."""
+        self.login_librarian()
+
+        # Пытаемся поменять work на второе произведение
+        bad_data = {'work_id': self.work2.id}
+        response = self.client.patch(self.details_url, data=bad_data, format='json')
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('work_id', response.json())
+        self.assertEqual(response.json()['work_id'][0],
+                         'Нельзя изменить произведение у издания, которое уже поступило в библиотеку.')
+
+    def test_librarian_cannot_change_isbn_if_copies_exist(self):
+        """Нельзя изменить ISBN, если у издания есть копии."""
+        self.login_librarian()
+
+        bad_data = {'isbn': '978-3-16-148410-0'}
+        response = self.client.patch(self.details_url, data=bad_data, format='json')
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('isbn', response.json())
+        self.assertEqual(response.json()['isbn'][0],
+                         'Нельзя изменить ISBN, так как на обложках экземпляров напечатан старый номер.')
+
     # --- Поиск и Сортировка ---
 
     def test_search_edition_by_isbn(self):

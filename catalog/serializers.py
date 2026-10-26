@@ -166,6 +166,24 @@ class EditionSerializer(serializers.ModelSerializer):
         """Валидация и форматирование ISBN на уровне API."""
         return isbn_validator(value)
 
+    def update(self, instance: Edition, validated_data: dict) -> Edition:
+        """Запрещаем менять произведение или ISBN, если у издания уже есть копии."""
+        has_copies = instance.copies.exists()
+
+        if has_copies:
+            # Проверка на изменение Work
+            if 'work' in validated_data and validated_data['work'] != instance.work:
+                raise serializers.ValidationError(
+                    {'work_id': ['Нельзя изменить произведение у издания, которое уже поступило в библиотеку.']}
+                )
+            # Проверка на изменение ISBN
+            if 'isbn' in validated_data and validated_data['isbn'] != instance.isbn:
+                raise serializers.ValidationError(
+                    {'isbn': ['Нельзя изменить ISBN, так как на обложках экземпляров напечатан старый номер.']}
+                )
+
+        return super().update(instance, validated_data)
+
 
 class BookCopySerializer(serializers.ModelSerializer):
     """Сериализатор для управления конкретными экземплярами книг."""
