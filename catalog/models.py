@@ -154,6 +154,12 @@ class Edition(models.Model):
         """
         return not self.copies.exclude(status=BookCopy.Status.WRITTEN_OFF).exists()
 
+    def generate_next_inventory_number(self) -> str:
+        """Генерирует следующий уникальный инвентарный номер для копии этого издания."""
+        existing_count = self.copies.count()
+        base_identifier = self.isbn or f'ED-{self.id}'
+        return f'{base_identifier}-{existing_count + 1}'
+
     def clean(self) -> None:
         super().clean()
         if self.isbn:

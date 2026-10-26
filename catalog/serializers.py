@@ -203,6 +203,17 @@ class BookCopySerializer(serializers.ModelSerializer):
             'location',
             'notes',
         ]
+        extra_kwargs = {
+            'inventory_number': {'required': False},
+        }
+
+    def create(self, validated_data: dict) -> BookCopy:
+        """При создании, если нет инвентарного номера, генерируем его."""
+        if not validated_data.get('inventory_number'):
+            edition = validated_data['edition']
+            validated_data['inventory_number'] = edition.generate_next_inventory_number()
+
+        return super().create(validated_data)
 
 
 class CopyCountSerializer(serializers.Serializer):
