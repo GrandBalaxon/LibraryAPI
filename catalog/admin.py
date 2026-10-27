@@ -1,12 +1,13 @@
 from django.contrib import admin
 from django.db.models import Count, QuerySet
 from django.http import HttpRequest
+from simple_history.admin import SimpleHistoryAdmin
 
 from catalog.models import Work, Author, Genre, Publisher, Edition, BookCopy
 
 
 @admin.register(Author)
-class AuthorAdmin(admin.ModelAdmin):
+class AuthorAdmin(SimpleHistoryAdmin):
     list_display = ('id', 'full_name', 'pseudonym', 'birth_date', 'works_count', 'translations_count')
     search_fields = ('last_name', 'first_name', 'middle_name', 'pseudonym')
     list_filter = ('birth_date',)
@@ -32,7 +33,7 @@ class AuthorAdmin(admin.ModelAdmin):
 
 
 @admin.register(Genre)
-class GenreAdmin(admin.ModelAdmin):
+class GenreAdmin(SimpleHistoryAdmin):
     list_display = ('id', 'name', 'works_count')
     search_fields = ('name',)
 
@@ -46,7 +47,7 @@ class GenreAdmin(admin.ModelAdmin):
 
 
 @admin.register(Publisher)
-class PublisherAdmin(admin.ModelAdmin):
+class PublisherAdmin(SimpleHistoryAdmin):
     list_display = ('id', 'name', 'editions_count')
     search_fields = ('name',)
 
@@ -60,7 +61,7 @@ class PublisherAdmin(admin.ModelAdmin):
 
 
 @admin.register(Work)
-class WorkAdmin(admin.ModelAdmin):
+class WorkAdmin(SimpleHistoryAdmin):
     list_display = (
         'id',
         'original_title',
@@ -99,7 +100,7 @@ class BookCopyInline(admin.TabularInline):
 
 
 @admin.register(Edition)
-class EditionAdmin(admin.ModelAdmin):
+class EditionAdmin(SimpleHistoryAdmin):
     list_display = (
         'id',
         'title',
@@ -142,7 +143,7 @@ class EditionAdmin(admin.ModelAdmin):
 
 
 @admin.register(BookCopy)
-class BookCopyAdmin(admin.ModelAdmin):
+class BookCopyAdmin(SimpleHistoryAdmin):
     """Отдельная страница для поиска и управления физическими книгами."""
     list_display = ('id', 'inventory_number', 'edition_title', 'status', 'condition', 'location')
     list_filter = ('status', 'condition')
