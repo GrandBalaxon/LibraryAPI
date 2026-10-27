@@ -42,23 +42,34 @@ class BookLoanAPITest(BaseAPITestCase):
 
     def test_reader_sees_only_own_loans(self):
         """Читатель видит только свои выдачи."""
-        self.login_reader()
+        self.login_librarian()
 
         # Создаем выдачу для другого читателя (используем библиотекаря)
-        other_loan = BookLoan.objects.create(
-            user=self.user_librarian,
-            book_copy=self.copy2,
-            loan_period_days=30,
-            status=BookLoan.Status.ACTIVE
-        )
+        data = {
+            'user_id': self.user_librarian.id,
+            'book_copy_id': self.copy2.id,
+            'loan_period_days': 14,
+        }
+        response = self.client.post(self.url, data=data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+        # Проверяем, что в БД появилась запись
+        loan = BookLoan.objects.get(id=response.json()['id'])
+        self.assertEqual(loan.user, self.user_librarian)
+        self.assertEqual(loan.book_copy, self.copy2)
+        self.assertEqual(loan.status, BookLoan.Status.ACTIVE)
+
+        self.logout()
+
+        self.login_reader()
 
         response = self.client.get(self.url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
-        data = response.json()
+        response_data = response.json()
         # Читатель должен видеть только 1 выдачу (свою, из setUp)
-        self.assertEqual(len(data), 1)
-        self.assertEqual(data[0]['id'], self.active_loan.id)
+        self.assertEqual(len(response_data), 1)
+        self.assertEqual(response_data[0]['id'], self.active_loan.id)
 
     def test_librarian_sees_all_loans(self):
         """Библиотекарь видит все выдачи."""

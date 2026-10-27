@@ -1,10 +1,12 @@
 from django.test import TestCase
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.test import APIRequestFactory
+
 from users.models import CustomUser
 from users.permissions import IsLibrarian, IsLibrarianOrReadOnly, IsOwnerOrLibrarian
 from users.views import UserViewSet
-from rest_framework.permissions import IsAuthenticated
+
 
 class UserPermissionsTest(TestCase):
     """Тесты для кастомных прав доступа."""
