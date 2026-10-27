@@ -4,21 +4,25 @@ from catalog.models import Author, Genre, Publisher, Work, Edition, BookCopy
 from catalog.validators import validate_isbn as isbn_validator
 
 
-class AuthorSerializer(serializers.ModelSerializer):
-    """Сериализатор для авторов."""
-    works_written = serializers.SerializerMethodField()
-    works_translated = serializers.SerializerMethodField()
+class AuthorBriefSerializer(serializers.ModelSerializer):
+    """Краткая информация об авторе для вложенных объектов."""
 
     class Meta:
         model = Author
-        fields = [
-            'id',
+        fields = ['id', 'full_name', 'pseudonym']
+
+
+class AuthorSerializer(AuthorBriefSerializer):
+    """Полный сериализатор для авторов."""
+    works_written = serializers.SerializerMethodField()
+    works_translated = serializers.SerializerMethodField()
+
+    class Meta(AuthorBriefSerializer.Meta):
+        fields = AuthorBriefSerializer.Meta.fields + [
             'first_name',
             'last_name',
             'middle_name',
             'birth_date',
-            'full_name',
-            'pseudonym',
             'biography',
             'works_written',
             'works_translated',
@@ -34,14 +38,6 @@ class AuthorSerializer(serializers.ModelSerializer):
         if hasattr(obj, 'translations_count'):
             return obj.translations_count
         return obj.translations.count()
-
-
-class AuthorBriefSerializer(serializers.ModelSerializer):
-    """Краткая информация об авторе для вложенных объектов."""
-
-    class Meta:
-        model = Author
-        fields = ['id', 'full_name', 'pseudonym']
 
 
 class GenreSerializer(serializers.ModelSerializer):
