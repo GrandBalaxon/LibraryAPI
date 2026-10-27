@@ -1,6 +1,8 @@
 from django.core.exceptions import ValidationError
+from django.core.validators import MinValueValidator
 from django.db import models
-from stdnum import isbn
+
+from catalog.validators import validate_isbn
 
 
 class Author(models.Model):
@@ -92,8 +94,12 @@ class Edition(models.Model):
     Конкретный выпуск (публикация) произведения в определенном издательстве,
     объединяющий экземпляры с одинаковым ISBN и годом выпуска.
     """
+    class Status(models.TextChoices):
+        ACTIVE = 'active', 'Активно'
+        ARCHIVED = 'archived', 'В архиве'
+
     work = models.ForeignKey(
-        Work, on_delete=models.CASCADE, related_name='editions', verbose_name='Произведение'
+        Work, on_delete=models.PROTECT, related_name='editions', verbose_name='Произведение'
     )
     title = models.CharField(max_length=255, verbose_name="Название перевода")
     isbn = models.CharField(
@@ -110,6 +116,7 @@ class Edition(models.Model):
         verbose_name='Издательства'
     )
     publication_year = models.PositiveIntegerField(
+        validators=[MinValueValidator(1)],
         verbose_name='Год издания'
     )
     language = models.CharField(max_length=50, verbose_name='Язык')
@@ -119,7 +126,16 @@ class Edition(models.Model):
         related_name='translations',
         verbose_name='Авторы перевода'
     )
-    pages = models.PositiveIntegerField(verbose_name='Количество страниц')
+    pages = models.PositiveIntegerField(
+        validators=[MinValueValidator(1)],
+        verbose_name='Количество страниц'
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.ACTIVE,
+        verbose_name='Статус'
+    )
 
     class Meta:
         db_table = 'editions'
@@ -130,18 +146,28 @@ class Edition(models.Model):
     def __str__(self) -> str:
         return f'{self.title} ({self.publication_year})'
 
+    def can_be_archived(self) -> bool:
+        """
+        Проверка возможности архивирования издания:
+        * Если все экземпляры списаны (или их вообще нет) — вернёт True.
+        * Если хотя бы один экземпляр не списан — вернёт False.
+        """
+        return not self.copies.exclude(status=BookCopy.Status.WRITTEN_OFF).exists()
+
+    def generate_next_inventory_number(self) -> str:
+        """Генерирует следующий уникальный инвентарный номер для копии этого издания."""
+        existing_count = self.copies.count()
+        base_identifier = self.isbn or f'ED-{self.id}'
+        return f'{base_identifier}-{existing_count + 1}'
+
     def clean(self) -> None:
         super().clean()
         if self.isbn:
             try:
-                # Валидируем и получаем компактный вид
-                compact_isbn = isbn.validate(self.isbn)
-                # Форматируем: приводим к ISBN-13 и добавляем правильные дефисы
-                self.isbn = isbn.format(compact_isbn, convert=True)
-            except (isbn.InvalidLength, isbn.InvalidChecksum):
-                raise ValidationError({'isbn': 'Некорректный формат или контрольная сумма ISBN.'})
-            except Exception:
-                raise ValidationError({'isbn': 'Некорректный ISBN'})
+                self.isbn = validate_isbn(self.isbn)
+            except ValidationError as exc:
+                # Оборачиваем под ключ поля, чтобы в админке/формах ошибка встала напротив input'а isbn
+                raise ValidationError({'isbn': exc.messages}) from exc
 
 
 class BookCopy(models.Model):
@@ -163,7 +189,7 @@ class BookCopy(models.Model):
 
     edition = models.ForeignKey(
         Edition,
-        on_delete=models.CASCADE,
+        on_delete=models.PROTECT,
         related_name='copies',
         verbose_name='Издание'
     )

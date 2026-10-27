@@ -1,23 +1,28 @@
 from rest_framework import serializers
 
 from catalog.models import Author, Genre, Publisher, Work, Edition, BookCopy
+from catalog.validators import validate_isbn as isbn_validator
 
 
-class AuthorSerializer(serializers.ModelSerializer):
-    """Сериализатор для авторов."""
-    works_written = serializers.SerializerMethodField()
-    works_translated = serializers.SerializerMethodField()
+class AuthorBriefSerializer(serializers.ModelSerializer):
+    """Краткая информация об авторе для вложенных объектов."""
 
     class Meta:
         model = Author
-        fields = [
-            'id',
+        fields = ['id', 'full_name', 'pseudonym']
+
+
+class AuthorSerializer(AuthorBriefSerializer):
+    """Полный сериализатор для авторов."""
+    works_written = serializers.SerializerMethodField()
+    works_translated = serializers.SerializerMethodField()
+
+    class Meta(AuthorBriefSerializer.Meta):
+        fields = AuthorBriefSerializer.Meta.fields + [
             'first_name',
             'last_name',
             'middle_name',
             'birth_date',
-            'full_name',
-            'pseudonym',
             'biography',
             'works_written',
             'works_translated',
@@ -35,15 +40,9 @@ class AuthorSerializer(serializers.ModelSerializer):
         return obj.translations.count()
 
 
-class AuthorBriefSerializer(serializers.ModelSerializer):
-    """Краткая информация об авторе для вложенных объектов."""
-    class Meta:
-        model = Author
-        fields = ['id', 'full_name', 'pseudonym']
-
-
 class GenreSerializer(serializers.ModelSerializer):
     """Сериализатор для жанров."""
+
     class Meta:
         model = Genre
         fields = ['id', 'name']
@@ -51,6 +50,7 @@ class GenreSerializer(serializers.ModelSerializer):
 
 class PublisherBriefSerializer(serializers.ModelSerializer):
     """Сериализатор для издательств без описания."""
+
     class Meta:
         model = Publisher
         fields = ['id', 'name']
@@ -58,6 +58,7 @@ class PublisherBriefSerializer(serializers.ModelSerializer):
 
 class PublisherSerializer(PublisherBriefSerializer):
     """Полный сериализатор для издательства (с описанием)."""
+
     class Meta(PublisherBriefSerializer.Meta):
         fields = PublisherBriefSerializer.Meta.fields + ['description']
 
@@ -101,6 +102,7 @@ class WorkSerializer(WorkBriefSerializer):
 
 class BookCopyBriefSerializer(serializers.ModelSerializer):
     """Краткая информация об экземпляре (для вложения в Edition)."""
+
     class Meta:
         model = BookCopy
         fields = ['id', 'inventory_number', 'status', 'condition', 'location']
@@ -129,7 +131,7 @@ class EditionSerializer(serializers.ModelSerializer):
         many=True
     )
     copies = BookCopyBriefSerializer(many=True, read_only=True)
-    copies_count = serializers.IntegerField(source='copies.count', read_only=True)
+    copies_count = serializers.SerializerMethodField()
     available_copies_count = serializers.SerializerMethodField()
 
     class Meta:
@@ -152,9 +154,43 @@ class EditionSerializer(serializers.ModelSerializer):
             'available_copies_count',
         ]
 
+    def get_copies_count(self, obj) -> int:
+        """Подсчёт всех экземпляров."""
+        # Если ViewSet сделал annotate (список), берем готовое число из базы
+        if hasattr(obj, 'total_copies_count'):
+            return obj.total_copies_count
+        # Если объект запрашивается в одиночку (retrieve), считаем вручную
+        return obj.copies.count()
+
     def get_available_copies_count(self, obj) -> int:
         """Подсчёт экземпляров, у которых статус AVAILABLE."""
+        # Если ViewSet сделал annotate (список), берем готовое число из базы
+        if hasattr(obj, 'available_copies_count'):
+            return obj.available_copies_count
+        # Если объект запрашивается в одиночку (retrieve), считаем вручную
         return obj.copies.filter(status=BookCopy.Status.AVAILABLE).count()
+
+    def validate_isbn(self, value: str | None) -> str | None:
+        """Валидация и форматирование ISBN на уровне API."""
+        return isbn_validator(value)
+
+    def update(self, instance: Edition, validated_data: dict) -> Edition:
+        """Запрещаем менять произведение или ISBN, если у издания уже есть копии."""
+        has_copies = instance.copies.exists()
+
+        if has_copies:
+            # Проверка на изменение Work
+            if 'work' in validated_data and validated_data['work'] != instance.work:
+                raise serializers.ValidationError(
+                    {'work_id': ['Нельзя изменить произведение у издания, которое уже поступило в библиотеку.']}
+                )
+            # Проверка на изменение ISBN
+            if 'isbn' in validated_data and validated_data['isbn'] != instance.isbn:
+                raise serializers.ValidationError(
+                    {'isbn': ['Нельзя изменить ISBN, так как на обложках экземпляров напечатан старый номер.']}
+                )
+
+        return super().update(instance, validated_data)
 
 
 class BookCopySerializer(serializers.ModelSerializer):
@@ -175,6 +211,17 @@ class BookCopySerializer(serializers.ModelSerializer):
             'location',
             'notes',
         ]
+        extra_kwargs = {
+            'inventory_number': {'required': False},
+        }
+
+    def create(self, validated_data: dict) -> BookCopy:
+        """При создании, если нет инвентарного номера, генерируем его."""
+        if not validated_data.get('inventory_number'):
+            edition = validated_data['edition']
+            validated_data['inventory_number'] = edition.generate_next_inventory_number()
+
+        return super().create(validated_data)
 
 
 class CopyCountSerializer(serializers.Serializer):

@@ -1,3 +1,4 @@
+from catalog.models import Publisher
 from catalog.tests.base import BaseAPITestCase
 
 
@@ -114,6 +115,26 @@ class PublisherAPITest(BaseAPITestCase):
         self.logout()
         response = self.client.delete(self.details_url)
         self.assertEqual(response.status_code, 401)
+
+    def test_librarian_can_delete_publisher_without_editions(self):
+        """Библиотекарь может удалить издательство, у которого нет выпущенных книг."""
+        self.login_librarian()
+
+        # 1. Создаем издательство через API (используя self.data из setUp)
+        create_response = self.client.post(self.url, data=self.data, format='json')
+        self.assertEqual(create_response.status_code, 201)
+
+        created_id = create_response.json()['id']
+        created_details_url = f"{self.url}{created_id}/"
+
+        # 2. Удаляем его
+        response = self.client.delete(created_details_url)
+
+        # Проверяем, что удаление прошло успешно (204)
+        self.assertEqual(response.status_code, 204)
+
+        # Проверяем, что его физически нет в БД
+        self.assertFalse(Publisher.objects.filter(id=created_id).exists())
 
     # --- Поиск ---
 
