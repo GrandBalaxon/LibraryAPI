@@ -1,7 +1,7 @@
 from typing import Any
 
 from django.contrib.auth.models import AnonymousUser
-from django.db.models import QuerySet, Count
+from django.db.models import QuerySet, Count, Q
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import extend_schema
 from rest_framework import viewsets, filters, status
@@ -131,7 +131,17 @@ class EditionViewSet(viewsets.ModelViewSet):
     def get_queryset(self) -> QuerySet[Edition]:
         queryset = Edition.objects.select_related('work').prefetch_related(
             'work__authors', 'work__genres', 'publishers', 'translators', 'copies'
+        ).annotate(
+            # Аннотируем общее количество копий
+            total_copies_count=Count('copies', distinct=True),
+            # Аннотируем количество ТОЛЬКО доступных копий
+            available_copies_count=Count(
+                'copies',
+                filter=Q(copies__status=BookCopy.Status.AVAILABLE),
+                distinct=True
+            )
         )
+
         user: CustomUser | AnonymousUser = self.request.user
 
         # Если пользователь — библиотекарь, он видит всё (и активные, и архивные издания)
@@ -183,7 +193,7 @@ class EditionViewSet(viewsets.ModelViewSet):
 
         BookCopy.objects.bulk_create(copies)
 
-        edition.refresh_from_db()
+        edition = self.get_queryset().get(pk=edition.pk)
         return Response(EditionSerializer(edition).data)
 
 

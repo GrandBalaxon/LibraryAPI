@@ -135,7 +135,7 @@ class EditionSerializer(serializers.ModelSerializer):
         many=True
     )
     copies = BookCopyBriefSerializer(many=True, read_only=True)
-    copies_count = serializers.IntegerField(source='copies.count', read_only=True)
+    copies_count = serializers.SerializerMethodField()
     available_copies_count = serializers.SerializerMethodField()
 
     class Meta:
@@ -158,8 +158,20 @@ class EditionSerializer(serializers.ModelSerializer):
             'available_copies_count',
         ]
 
+    def get_copies_count(self, obj) -> int:
+        """Подсчёт всех экземпляров."""
+        # Если ViewSet сделал annotate (список), берем готовое число из базы
+        if hasattr(obj, 'total_copies_count'):
+            return obj.total_copies_count
+        # Если объект запрашивается в одиночку (retrieve), считаем вручную
+        return obj.copies.count()
+
     def get_available_copies_count(self, obj) -> int:
         """Подсчёт экземпляров, у которых статус AVAILABLE."""
+        # Если ViewSet сделал annotate (список), берем готовое число из базы
+        if hasattr(obj, 'available_copies_count'):
+            return obj.available_copies_count
+        # Если объект запрашивается в одиночку (retrieve), считаем вручную
         return obj.copies.filter(status=BookCopy.Status.AVAILABLE).count()
 
     def validate_isbn(self, value: str | None) -> str | None:
