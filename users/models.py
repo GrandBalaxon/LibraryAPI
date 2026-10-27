@@ -5,6 +5,7 @@ from django.contrib.auth.base_user import BaseUserManager
 from django.contrib.auth.models import AbstractUser
 from django.core.exceptions import ValidationError
 from django.db import models
+from simple_history.models import HistoricalRecords
 
 
 class CustomUserManager(BaseUserManager['CustomUser']):
@@ -35,6 +36,7 @@ class CustomUserManager(BaseUserManager['CustomUser']):
 
 class CustomUser(AbstractUser):
     """Кастомная модель пользователя."""
+
     class Role(models.TextChoices):
         READER = 'reader', 'Читатель'
         LIBRARIAN = 'librarian', 'Библиотекарь'
@@ -60,6 +62,7 @@ class CustomUser(AbstractUser):
     last_name = models.CharField(max_length=150, verbose_name='Фамилия')
     phone_number = models.CharField(max_length=20, unique=True, verbose_name='Номер телефона')
     place_of_birth = models.CharField(max_length=150, verbose_name='Город рождения')
+    history = HistoricalRecords()
 
     @property
     def full_name(self) -> str:
