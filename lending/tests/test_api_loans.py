@@ -225,6 +225,17 @@ class BookLoanAPITest(BaseAPITestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(response.json()['detail'], 'Книга уже возвращена.')
 
+    def test_book_loan_history(self):
+        """Проверяем, что при выдаче и возврате книги пишется аудит."""
+        self.assertEqual(self.active_loan.history.count(), 1)
+
+        self.active_loan.status = BookLoan.Status.RETURNED
+        self.active_loan.save()
+
+        self.assertEqual(self.active_loan.history.count(), 2)
+        self.assertEqual(self.active_loan.history.first().history_type, '~')
+        self.assertEqual(self.active_loan.history.first().status, BookLoan.Status.RETURNED)
+
     # --- Просрочка (is_overdue) ---
 
     def test_loan_is_not_overdue(self):
