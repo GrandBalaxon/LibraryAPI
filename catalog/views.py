@@ -8,6 +8,7 @@ from rest_framework import viewsets, filters, status
 from rest_framework.decorators import action
 from rest_framework.request import Request
 from rest_framework.response import Response
+from simple_history.utils import bulk_create_with_history
 
 from catalog.models import Author, Genre, Publisher, Work, Edition, BookCopy
 from catalog.serializers import (
@@ -191,7 +192,12 @@ class EditionViewSet(viewsets.ModelViewSet):
             inv_number = f'{base_identifier}-{existing_count + i + 1}'
             copies.append(BookCopy(edition=edition, inventory_number=inv_number))
 
-        BookCopy.objects.bulk_create(copies)
+        bulk_create_with_history(
+            objs=copies,
+            model=BookCopy,
+            default_user=request.user,
+            default_change_reason='Массовое добавление экземпляров через API'
+        )
 
         edition = self.get_queryset().get(pk=edition.pk)
         return Response(EditionSerializer(edition).data)
