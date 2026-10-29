@@ -75,13 +75,52 @@ class PublisherAPITest(BaseAPITestCase):
     # --- Обновление ---
 
     def test_librarian_can_update_publisher(self):
-        """Библиотекарь может изменять данные издательства."""
+        """
+        Библиотекарь может изменять данные издателя у которого есть изданные им экземпляры,
+        если укажет причину.
+        """
         self.login_librarian()
-        patch_response = self.client.patch(self.details_url, data=self.data, format='json')
+
+        data = {**self.data, 'change_reason': 'Просто захотелось...'}
+
+        patch_response = self.client.patch(self.details_url, data=data, format='json')
         self.assertEqual(patch_response.status_code, 200)
 
         self.publisher.refresh_from_db()
         self.assertEqual(self.publisher.name, 'Эксмо')
+
+    def test_librarian_can_update_publisher_without_editions_tied_to_it(self):
+        """Библиотекарь может изменять данные издателя у которого есть изданные им экземпляры без указания причины."""
+        self.login_librarian()
+
+        # создаем нового издателя без привязанных к нему изданных книг
+        post_response = self.client.post(self.url, data=self.data, format='json')
+        self.assertEqual(post_response.status_code, 201)
+
+        # получаем url нового издателя
+        new_publisher_id = post_response.json()['id']
+        new_publisher_url = f"{self.url}{new_publisher_id}/"
+
+        # Меняем данные нового издателя без указания причины
+        new_data = {'name': 'Обновленное имя издателя без книг'}
+        patch_response = self.client.patch(new_publisher_url, data=new_data, format='json')
+        self.assertEqual(patch_response.status_code, 200)
+
+        # Проверяем, что в БД данные действительно поменялись
+        new_publisher = Publisher.objects.get(id=new_publisher_id)
+        self.assertEqual(new_publisher.name, 'Обновленное имя издателя без книг')
+
+    def test_librarian_cannot_update_publisher_without_a_change_reason(self):
+        """
+        Библиотекарь НЕ может поменять данные издателя у которого есть изданные им экземпляры,
+        без указания причины изменения.
+        """
+        self.login_librarian()
+
+        patch_response = self.client.patch(self.details_url, data=self.data, format='json')
+
+        self.assertEqual(patch_response.status_code, 400)
+        self.assertIn('change_reason', patch_response.json())
 
     def test_reader_cannot_update_publisher(self):
         """Читатель не может менять издательство."""

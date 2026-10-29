@@ -66,11 +66,15 @@ class PublisherBriefSerializer(serializers.ModelSerializer):
         fields = ['id', 'name']
 
 
-class PublisherSerializer(PublisherBriefSerializer):
+class PublisherSerializer(ChangeReasonMixin, PublisherBriefSerializer):
     """Полный сериализатор для издательства (с описанием)."""
+    critical_fields = ['name']
 
     class Meta(PublisherBriefSerializer.Meta):
-        fields = PublisherBriefSerializer.Meta.fields + ['description']
+        fields = PublisherBriefSerializer.Meta.fields + ['description'] + ChangeReasonMixin.Meta.fields
+
+    def has_dependencies(self, instance: Publisher) -> bool:
+        return instance.editions.exists()
 
 
 class WorkBriefSerializer(serializers.ModelSerializer):

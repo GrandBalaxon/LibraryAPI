@@ -9,6 +9,10 @@ class ChangeReasonMixin(serializers.Serializer):
     """
     Миксин для валидации причины изменения критических полей.
     Наследники должны определить critical_fields (список) и has_dependencies (метод проверки).
+
+    Attributes:
+        change_reason: Виртуальное поле для приема текста причины изменения от пользователя.
+        critical_fields: Список названий полей, при изменении которых требуется указывать причину.
     """
     change_reason = serializers.CharField(
         write_only=True,
