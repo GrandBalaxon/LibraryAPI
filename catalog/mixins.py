@@ -15,13 +15,22 @@ class ChangeReasonMixin(serializers.Serializer):
         required=False,
         help_text="Укажите причину изменения критических данных"
     )
+    critical_fields: list[str | Any] = []
 
     class Meta:
         fields = ['change_reason']
 
+    def has_dependencies(self, instance: models.Model) -> bool:
+        """
+        Проверка наличия зависимостей (связанных объектов) у модели.
+        По умолчанию возвращает True (требовать причину для всех).
+        Переопределите в наследнике, если причину нужно требовать только при наличии связей.
+        """
+        return True
+
     def update(self, instance: models.Model, validated_data: dict[str, Any]) -> models.Model:
         change_reason = validated_data.pop('change_reason', None)
-        critical_fields = getattr(self, 'critical_fields', [])
+        critical_fields = self.critical_fields
 
         is_critical_change = False
         for field in critical_fields:
@@ -30,7 +39,7 @@ class ChangeReasonMixin(serializers.Serializer):
                 break
 
         # Проверка зависимости (например, есть ли копии)
-        if is_critical_change and hasattr(self, 'has_dependencies') and not self.has_dependencies(instance):
+        if is_critical_change and not self.has_dependencies(instance):
             is_critical_change = False
 
         if is_critical_change and not change_reason:
