@@ -137,3 +137,6 @@ if 'test' in sys.argv:
             'NAME': BASE_DIR / 'test_db.sqlite3',
         }
     }
+
+# django-simple-history settings
+SIMPLE_HISTORY_HISTORY_CHANGE_REASON_USE_TEXT_FIELD = True

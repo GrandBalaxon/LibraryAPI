@@ -178,9 +178,17 @@ class BookLoanAPITest(BaseAPITestCase):
         self.assertEqual(self.active_loan.status, BookLoan.Status.RETURNED)
         self.assertIsNotNone(self.active_loan.returned_at)
 
+        # Проверяем, что в историю записалась системная причина для выдачи
+        loan_latest_history = self.active_loan.history.first()
+        self.assertEqual(loan_latest_history.history_change_reason, "Возврат книги через API")
+
         # Проверяем, что книга снова доступна
         self.copy_hobbit.refresh_from_db()
         self.assertEqual(self.copy_hobbit.status, BookCopy.Status.AVAILABLE)
+
+        # Проверяем, что у копии книги тоже вв истории записана причина изменения
+        copy_latest_history = self.copy_hobbit.history.first()
+        self.assertEqual(copy_latest_history.history_change_reason, "Возврат книги через API")
 
     def test_librarian_cannot_return_already_returned_book(self):
         """Нельзя вернуть книгу, которая уже возвращена."""
