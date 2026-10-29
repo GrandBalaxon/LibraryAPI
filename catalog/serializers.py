@@ -46,12 +46,16 @@ class AuthorSerializer(ChangeReasonMixin, AuthorBriefSerializer):
         return instance.works.exists()
 
 
-class GenreSerializer(serializers.ModelSerializer):
+class GenreSerializer(ChangeReasonMixin, serializers.ModelSerializer):
     """Сериализатор для жанров."""
+    critical_fields = ['name']
 
     class Meta:
         model = Genre
-        fields = ['id', 'name']
+        fields = ['id', 'name'] + ChangeReasonMixin.Meta.fields
+
+    def has_dependencies(self, instance: Genre) -> bool:
+        return instance.works.exists()
 
 
 class PublisherBriefSerializer(serializers.ModelSerializer):
