@@ -91,14 +91,51 @@ class WorkAPITest(BaseAPITestCase):
     # --- Обновление ---
 
     def test_librarian_can_update_work(self):
-        """Библиотекарь может изменять произведение."""
+        """Библиотекарь может изменять произведение с изданными книгами, добавив причину своих изменений."""
         self.login_librarian()
-        patch_data = {'original_title': 'Обновленное название'}
+
+        patch_data = {
+            'original_title': 'Обновленное название',
+            'change_reason': 'Просто захотелось...'
+        }
+
         response = self.client.patch(self.details_url, data=patch_data, format='json')
         self.assertEqual(response.status_code, 200)
 
         self.work.refresh_from_db()
         self.assertEqual(self.work.original_title, 'Обновленное название')
+
+    def test_librarian_can_update_work_without_any_book_copies_tied_to_it(self):
+        """Библиотекарь может изменять произведение без изданных книг, НЕ добавив причину своих изменений."""
+        self.login_librarian()
+
+        # создаем новое произведение
+        post_response = self.client.post(self.url, data=self.data, format='json')
+        self.assertEqual(post_response.status_code, 201)
+
+        # получаем url нового произведения
+        new_work_id = post_response.json()['id']
+        new_work_url = f"{self.url}{new_work_id}/"
+
+        # Меняем данные нового произведения без указания причины
+        new_data = {'original_title': 'Обновленный оригинальный тайтл'}
+        patch_response = self.client.patch(new_work_url, data=new_data, format='json')
+        self.assertEqual(patch_response.status_code, 200)
+
+        # Проверяем, что в БД данные действительно поменялись
+        new_work = Work.objects.get(id=new_work_id)
+        self.assertEqual(new_work.original_title, 'Обновленный оригинальный тайтл')
+
+    def test_librarian_cannot_update_work_without_a_change_reason(self):
+        """Библиотекарь НЕ может изменять произведение с изданными книгами, НЕ добавив причину своих изменений."""
+        self.login_librarian()
+
+        patch_data = {'original_title': 'Обновленное название'}
+
+        patch_response = self.client.patch(self.details_url, data=patch_data, format='json')
+
+        self.assertEqual(patch_response.status_code, 400)
+        self.assertIn('change_reason', patch_response.json())
 
     def test_reader_cannot_update_work(self):
         """Читатель не может менять произведение."""

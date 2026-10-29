@@ -95,7 +95,7 @@ class WorkBriefSerializer(serializers.ModelSerializer):
         ]
 
 
-class WorkSerializer(WorkBriefSerializer):
+class WorkSerializer(ChangeReasonMixin, WorkBriefSerializer):
     """Полный сериализатор произведения с полями для записи связей."""
     author_ids = serializers.PrimaryKeyRelatedField(
         source='authors',
@@ -109,9 +109,13 @@ class WorkSerializer(WorkBriefSerializer):
         many=True,
         write_only=True
     )
+    critical_fields = ['original_title']
 
     class Meta(WorkBriefSerializer.Meta):
-        fields = WorkBriefSerializer.Meta.fields + ['author_ids', 'genre_ids']
+        fields = WorkBriefSerializer.Meta.fields + ['author_ids', 'genre_ids'] + ChangeReasonMixin.Meta.fields
+
+    def has_dependencies(self, instance: Work) -> bool:
+        return instance.editions.exists()
 
 
 class BookCopyBriefSerializer(serializers.ModelSerializer):
