@@ -1,5 +1,6 @@
 from rest_framework import serializers
 
+from catalog.mixins import ChangeReasonMixin
 from catalog.models import Author, Genre, Publisher, Work, Edition, BookCopy
 from catalog.validators import validate_isbn as isbn_validator
 
@@ -12,15 +13,12 @@ class AuthorBriefSerializer(serializers.ModelSerializer):
         fields = ['id', 'full_name', 'pseudonym']
 
 
-class AuthorSerializer(AuthorBriefSerializer):
+class AuthorSerializer(ChangeReasonMixin, AuthorBriefSerializer):
     """Полный сериализатор для авторов."""
     works_written = serializers.SerializerMethodField()
     works_translated = serializers.SerializerMethodField()
-    change_reason = serializers.CharField(
-        write_only=True,
-        required=False,
-        help_text="Укажите причину изменения критических данных"
-    )
+
+    critical_fields = ['first_name', 'last_name', 'middle_name']
 
     class Meta(AuthorBriefSerializer.Meta):
         fields = AuthorBriefSerializer.Meta.fields + [
@@ -30,9 +28,8 @@ class AuthorSerializer(AuthorBriefSerializer):
             'birth_date',
             'biography',
             'works_written',
-            'works_translated',
-            'change_reason'
-        ]
+            'works_translated'
+        ] + ChangeReasonMixin.Meta.fields
         read_only_fields = ['full_name']
 
     def get_works_written(self, obj) -> int:
@@ -45,30 +42,8 @@ class AuthorSerializer(AuthorBriefSerializer):
             return obj.translations_count
         return obj.translations.count()
 
-    def update(self, instance: Author, validated_data: dict) -> Author:
-        """Проверка наличия причины изменений при изменении ключевых полей модели."""
-        change_reason = validated_data.pop('change_reason', None)
-
-        # Проверяем, меняются ли ключевые поля
-        new_first_name = validated_data.get('first_name', instance.first_name)
-        new_last_name = validated_data.get('last_name', instance.last_name)
-        new_middle_name = validated_data.get('middle_name', instance.middle_name)
-
-        is_critical_change = (
-                new_last_name != instance.last_name or
-                new_first_name != instance.first_name or
-                new_middle_name != instance.middle_name
-        )
-
-        if is_critical_change and not change_reason:
-            raise serializers.ValidationError(
-                {"change_reason": ["Вы изменяете Ф.И.О. автора. Пожалуйста, укажите причину изменения."]}
-            )
-
-        if change_reason:
-            instance._change_reason = change_reason
-
-        return super().update(instance, validated_data)
+    def has_dependencies(self, instance: Author) -> bool:
+        return instance.works.exists()
 
 
 class GenreSerializer(serializers.ModelSerializer):
