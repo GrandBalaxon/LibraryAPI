@@ -16,6 +16,11 @@ class AuthorSerializer(AuthorBriefSerializer):
     """Полный сериализатор для авторов."""
     works_written = serializers.SerializerMethodField()
     works_translated = serializers.SerializerMethodField()
+    change_reason = serializers.CharField(
+        write_only=True,
+        required=False,
+        help_text="Укажите причину изменения критических данных"
+    )
 
     class Meta(AuthorBriefSerializer.Meta):
         fields = AuthorBriefSerializer.Meta.fields + [
@@ -26,6 +31,7 @@ class AuthorSerializer(AuthorBriefSerializer):
             'biography',
             'works_written',
             'works_translated',
+            'change_reason'
         ]
         read_only_fields = ['full_name']
 
@@ -38,6 +44,31 @@ class AuthorSerializer(AuthorBriefSerializer):
         if hasattr(obj, 'translations_count'):
             return obj.translations_count
         return obj.translations.count()
+
+    def update(self, instance: Author, validated_data: dict) -> Author:
+        """Проверка наличия причины изменений при изменении ключевых полей модели."""
+        change_reason = validated_data.pop('change_reason', None)
+
+        # Проверяем, меняются ли ключевые поля
+        new_first_name = validated_data.get('first_name', instance.first_name)
+        new_last_name = validated_data.get('last_name', instance.last_name)
+        new_middle_name = validated_data.get('middle_name', instance.middle_name)
+
+        is_critical_change = (
+                new_last_name != instance.last_name or
+                new_first_name != instance.first_name or
+                new_middle_name != instance.middle_name
+        )
+
+        if is_critical_change and not change_reason:
+            raise serializers.ValidationError(
+                {"change_reason": ["Вы изменяете Ф.И.О. автора. Пожалуйста, укажите причину изменения."]}
+            )
+
+        if change_reason:
+            instance._change_reason = change_reason
+
+        return super().update(instance, validated_data)
 
 
 class GenreSerializer(serializers.ModelSerializer):
