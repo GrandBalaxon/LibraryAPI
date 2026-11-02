@@ -130,7 +130,7 @@ REST_FRAMEWORK = {
 }
 
 # Датабаза sqlite3 для запуска тестов
-if 'test' in sys.argv:
+if 'test' in sys.argv or os.getenv('CI') == 'true':
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.sqlite3',
