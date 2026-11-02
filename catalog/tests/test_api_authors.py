@@ -17,6 +17,8 @@ class AuthorAPITest(BaseAPITestCase):
             "biography": "Тестовый автор."
         }
 
+    # --- Чтение ---
+
     def test_list_authors_reader_allowed(self):
         """Читатель может получить список авторов."""
         self.login_reader()
@@ -36,6 +38,22 @@ class AuthorAPITest(BaseAPITestCase):
         self.logout()
         response = self.client.get(self.url)
         self.assertIn(response.status_code, (401, 403))
+
+    def test_reader_can_get_author_details(self):
+        """Читатель может запросить информацию об авторе."""
+        self.login_reader()
+        details_response = self.client.get(self.details_url)
+        self.assertEqual(details_response.status_code, 200)
+        author_data = details_response.json()
+        self.assertEqual(author_data['first_name'], 'Эрик')
+
+    def test_anonymous_cannot_get_author_details(self):
+        """Аноним не может получить деталей об авторе."""
+        self.logout()
+        detail_response = self.client.get(self.details_url)
+        self.assertEqual(detail_response.status_code, 401)
+
+    # --- Создание ---
 
     def test_librarian_can_add_new_author(self):
         """Библиотекарь может добавить нового автора."""
@@ -70,37 +88,7 @@ class AuthorAPITest(BaseAPITestCase):
         response = self.client.post(self.url, data=self.data, format='json')
         self.assertEqual(response.status_code, 401)
 
-    def test_reader_can_get_author_details(self):
-        """Читатель может запросить информацию об авторе."""
-        self.login_reader()
-        details_response = self.client.get(self.details_url)
-        self.assertEqual(details_response.status_code, 200)
-        author_data = details_response.json()
-        self.assertEqual(author_data['first_name'], 'Эрик')
-
-    def test_anonymous_cannot_get_author_details(self):
-        """Аноним не может получить деталей об авторе."""
-        self.logout()
-        detail_response = self.client.get(self.details_url)
-        self.assertEqual(detail_response.status_code, 401)
-
-    def test_librarian_can_update_author_details(self):
-        """Библиотекарь может изменять данные автора."""
-        self.login_librarian()
-
-        # проверка старых данных
-        details_response = self.client.get(self.details_url)
-        author_data = details_response.json()
-        self.assertEqual(author_data['first_name'], 'Эрик')
-
-        # обновление данных
-        patch_response = self.client.patch(self.details_url, data=self.data, format='json')
-        self.assertEqual(patch_response.status_code, 200)
-
-        # проверка измененных данных автора
-        updated_details_response = self.client.get(self.details_url)
-        updated_author_data = updated_details_response.json()
-        self.assertEqual(updated_author_data['first_name'], 'Тест')
+    # --- Обновление ---
 
     def test_reader_cannot_update_author_details(self):
         """Читатель не может менять данные автора."""
@@ -113,6 +101,47 @@ class AuthorAPITest(BaseAPITestCase):
         self.logout()
         patch_response = self.client.patch(self.details_url, data=self.data, format='json')
         self.assertEqual(patch_response.status_code, 401)
+
+    def test_librarian_must_provide_reason_to_change_name(self):
+        """Нельзя изменить имя автора без указания причины."""
+        self.login_librarian()
+
+        # 1. Пытаемся изменить имя без причины
+        patch_data_first = {'first_name': 'Новое имя'}
+        response_first = self.client.patch(self.details_url, data=patch_data_first, format='json')
+        self.assertEqual(response_first.status_code, 400)
+        self.assertIn('change_reason', response_first.json())
+
+        # 2. Пытаемся изменить фамилию без причины
+        patch_data_last = {'last_name': 'Новая фамилия'}
+        response_last = self.client.patch(self.details_url, data=patch_data_last, format='json')
+        self.assertEqual(response_last.status_code, 400)
+
+        # 3. Пытаемся изменить отчество без причины
+        patch_data_middle = {'middle_name': 'Новое отчество'}
+        response_middle = self.client.patch(self.details_url, data=patch_data_middle, format='json')
+        self.assertEqual(response_middle.status_code, 400)
+
+    def test_librarian_can_change_name_with_reason(self):
+        """Можно изменить имя, если указана причина."""
+        self.login_librarian()
+
+        # Меняем фамилию и указываем причину
+        patch_data = {
+            'last_name': 'Новая фамилия',
+            'change_reason': 'Опечатка в старой фамилии'
+        }
+        response = self.client.patch(self.details_url, data=patch_data, format='json')
+
+        self.assertEqual(response.status_code, 200)
+
+        # Проверяем, что в истории сохранилась наша причина!
+        self.author.refresh_from_db()
+        latest_history = self.author.history.first()
+        self.assertEqual(latest_history.last_name, 'Новая фамилия')
+        self.assertEqual(latest_history.history_change_reason, 'Опечатка в старой фамилии')
+
+    # --- Удаление ---
 
     def test_anonymous_cannot_delete_author_details(self):
         """Аноним не может удалять автора книг."""
@@ -153,9 +182,6 @@ class AuthorAPITest(BaseAPITestCase):
         """
         Библиотекарь НЕ может просто взять и удалить автора у которого есть книги, экземпляры которых уже
         представлены в библиотеке или находятся на руках у читателей.
-
-        То есть у автора есть написанные им произведения (Books), у которых есть книги (BookEditions), находящиеся
-        в датабазе библиотеки и их количество (total_copies) не равно нулю.
         """
         self.login_librarian()
 
@@ -171,6 +197,8 @@ class AuthorAPITest(BaseAPITestCase):
 
         # Проверяем, что автор остался в базе данных
         self.assertTrue(Author.objects.filter(id=self.author.id).exists())
+
+    # --- Сортировка и Поиск ---
 
     def test_search_author_by_pseudonym(self):
         """Проверка поиска автора по псевдониму (SearchFilter)."""

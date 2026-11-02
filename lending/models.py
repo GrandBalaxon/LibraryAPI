@@ -1,5 +1,6 @@
 from django.db import models
 from django.utils import timezone
+from simple_history.models import HistoricalRecords
 
 from catalog.models import BookCopy
 from config import settings
@@ -45,6 +46,7 @@ class BookLoan(models.Model):
         default=Status.ACTIVE,
         verbose_name='Статус'
     )
+    history = HistoricalRecords()
 
     @property
     def is_overdue(self) -> bool:

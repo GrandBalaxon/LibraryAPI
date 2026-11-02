@@ -138,17 +138,102 @@ class EditionAPITest(BaseAPITestCase):
         response = self.client.post(self.url, data=self.data, format='json')
         self.assertEqual(response.status_code, 403)
 
-    # --- Обновление и Удаление ---
+    # --- Обновление ---
 
-    def test_librarian_can_update_edition(self):
-        """Библиотекарь может изменять издание."""
+    def test_librarian_can_update_non_critical_fields_without_reason(self):
+        """Библиотекарь может изменить количество страниц (некритичное поле) без указания причины."""
         self.login_librarian()
+
+        # 'pages' нет в critical_fields, поэтому change_reason не требуется
         patch_data = {'pages': 400}
         response = self.client.patch(self.details_url, data=patch_data, format='json')
+
         self.assertEqual(response.status_code, 200)
 
         self.edition.refresh_from_db()
         self.assertEqual(self.edition.pages, 400)
+
+    def test_librarian_can_update_critical_fields_with_reason(self):
+        """Библиотекарь может изменить критичное поле (title) при указании причины."""
+        self.login_librarian()
+
+        patch_data = {
+            'title': 'Новое название перевода',
+            'change_reason': 'Исправление опечатки в названии'
+        }
+        response = self.client.patch(self.details_url, data=patch_data, format='json')
+
+        self.assertEqual(response.status_code, 200)
+
+        self.edition.refresh_from_db()
+        self.assertEqual(self.edition.title, 'Новое название перевода')
+
+        # Проверяем, что в историю записалась причина
+        latest_history = self.edition.history.first()
+        self.assertEqual(latest_history.history_change_reason, 'Исправление опечатки в названии')
+
+    def test_librarian_cannot_update_critical_fields_without_reason_if_copies_exist(self):
+        """Нельзя изменить критичное поле (title) без причины, если у издания есть копии."""
+        self.login_librarian()
+
+        # У self.edition в базе есть 2 копии, поэтому has_dependencies вернет True
+        patch_data = {'title': 'Обновленный тайтл без причины'}
+        response = self.client.patch(self.details_url, data=patch_data, format='json')
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('change_reason', response.json())
+
+    def test_librarian_can_update_critical_fields_without_reason_if_no_copies_exist(self):
+        """Можно изменить критичное поле без причины, если у издания нет копий."""
+        self.login_librarian()
+
+        # Создаем новое издание (без копий)
+        create_data = {**self.data}
+        create_data.pop('isbn', None)
+
+        create_response = self.client.post(self.url, data=create_data, format='json')
+
+        new_edition_id = create_response.json()['id']
+        new_edition_url = f"{self.url}{new_edition_id}/"
+
+        # Меняем title без причины
+        patch_data = {'title': 'Тайтл без причины'}
+        response = self.client.patch(new_edition_url, data=patch_data, format='json')
+
+        self.assertEqual(response.status_code, 200)
+
+    def test_librarian_cannot_change_work_if_copies_exist(self):
+        """Нельзя изменить произведение, если у издания есть физические копии (даже с причиной)."""
+        self.login_librarian()
+
+        # Пытаемся поменять work на второе произведение и даже добавляем причину
+        bad_data = {
+            'work_id': self.work2.id,
+            'change_reason': 'Пытаюсь обмануть систему'
+        }
+        response = self.client.patch(self.details_url, data=bad_data, format='json')
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('work_id', response.json())
+        self.assertEqual(response.json()['work_id'][0],
+                         'Нельзя изменить произведение у издания, которое уже поступило в библиотеку.')
+
+    def test_librarian_cannot_change_isbn_if_copies_exist(self):
+        """Нельзя изменить ISBN, если у издания есть копии (даже с причиной)."""
+        self.login_librarian()
+
+        bad_data = {
+            'isbn': '978-3-16-148410-0',
+            'change_reason': 'Пытаюсь обновить ISBN'
+        }
+        response = self.client.patch(self.details_url, data=bad_data, format='json')
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('isbn', response.json())
+        self.assertEqual(response.json()['isbn'][0],
+                         'Нельзя изменить ISBN, так как на обложках экземпляров напечатан старый номер.')
+
+    # --- Удаление ---
 
     def test_librarian_cannot_delete_or_archive_edition_with_active_copies(self):
         """Библиотекарь НЕ может удалить или архивировать издание, если у него есть не списанные копии."""
@@ -166,31 +251,6 @@ class EditionAPITest(BaseAPITestCase):
 
         # 3. Проверяем, что запись осталась в БД
         self.assertTrue(Edition.objects.filter(id=self.edition.id).exists())
-
-    def test_librarian_cannot_change_work_if_copies_exist(self):
-        """Нельзя изменить произведение, если у издания есть физические копии."""
-        self.login_librarian()
-
-        # Пытаемся поменять work на второе произведение
-        bad_data = {'work_id': self.work2.id}
-        response = self.client.patch(self.details_url, data=bad_data, format='json')
-
-        self.assertEqual(response.status_code, 400)
-        self.assertIn('work_id', response.json())
-        self.assertEqual(response.json()['work_id'][0],
-                         'Нельзя изменить произведение у издания, которое уже поступило в библиотеку.')
-
-    def test_librarian_cannot_change_isbn_if_copies_exist(self):
-        """Нельзя изменить ISBN, если у издания есть копии."""
-        self.login_librarian()
-
-        bad_data = {'isbn': '978-3-16-148410-0'}
-        response = self.client.patch(self.details_url, data=bad_data, format='json')
-
-        self.assertEqual(response.status_code, 400)
-        self.assertIn('isbn', response.json())
-        self.assertEqual(response.json()['isbn'][0],
-                         'Нельзя изменить ISBN, так как на обложках экземпляров напечатан старый номер.')
 
     def test_librarian_can_delete_edition_without_copies(self):
         """Библиотекарь может физически удалить издание, если у него нет ни одной копии."""

@@ -5,13 +5,14 @@ from django.db import transaction
 from django.utils import timezone
 from rest_framework import serializers
 
+from catalog.mixins import ChangeReasonMixin
 from catalog.models import BookCopy
 from catalog.serializers import BookCopyBriefSerializer
 from lending.models import BookLoan
 from users.models import CustomUser
 
 
-class BookLoanSerializer(serializers.ModelSerializer):
+class BookLoanSerializer(ChangeReasonMixin, serializers.ModelSerializer):
     """Сериализатор выдачи книги."""
     # Для чтения (GET) отдаем вложенный объект (с инвентарным номером)
     book_copy = BookCopyBriefSerializer(read_only=True)
@@ -29,6 +30,8 @@ class BookLoanSerializer(serializers.ModelSerializer):
     is_overdue = serializers.BooleanField(read_only=True)
     loan_period_days = serializers.IntegerField(min_value=1, required=False, default=30)
 
+    critical_fields = ['due_date']
+
     class Meta:
         model = BookLoan
         fields = [
@@ -43,7 +46,7 @@ class BookLoanSerializer(serializers.ModelSerializer):
             'returned_at',
             'status',
             'is_overdue'
-        ]
+        ] + ChangeReasonMixin.Meta.fields
         read_only_fields = ['borrowed_at', 'returned_at', 'status', 'is_overdue']
 
     def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
@@ -55,6 +58,9 @@ class BookLoanSerializer(serializers.ModelSerializer):
         return attrs
 
     def create(self, validated_data: dict[str, Any]) -> BookLoan:
+        # Убираем change_reason, так как при создании выдачи причина не нужна
+        validated_data.pop('change_reason', None)
+
         loan_period_days: int = validated_data.get('loan_period_days', 30)
         due_date = validated_data.get('due_date')
 

@@ -178,9 +178,17 @@ class BookLoanAPITest(BaseAPITestCase):
         self.assertEqual(self.active_loan.status, BookLoan.Status.RETURNED)
         self.assertIsNotNone(self.active_loan.returned_at)
 
+        # Проверяем, что в историю записалась системная причина для выдачи
+        loan_latest_history = self.active_loan.history.first()
+        self.assertEqual(loan_latest_history.history_change_reason, "Возврат книги через API")
+
         # Проверяем, что книга снова доступна
         self.copy_hobbit.refresh_from_db()
         self.assertEqual(self.copy_hobbit.status, BookCopy.Status.AVAILABLE)
+
+        # Проверяем, что у копии книги тоже вв истории записана причина изменения
+        copy_latest_history = self.copy_hobbit.history.first()
+        self.assertEqual(copy_latest_history.history_change_reason, "Возврат книги через API")
 
     def test_librarian_cannot_return_already_returned_book(self):
         """Нельзя вернуть книгу, которая уже возвращена."""
@@ -225,6 +233,17 @@ class BookLoanAPITest(BaseAPITestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(response.json()['detail'], 'Книга уже возвращена.')
 
+    def test_book_loan_history(self):
+        """Проверяем, что при выдаче и возврате книги пишется аудит."""
+        self.assertEqual(self.active_loan.history.count(), 1)
+
+        self.active_loan.status = BookLoan.Status.RETURNED
+        self.active_loan.save()
+
+        self.assertEqual(self.active_loan.history.count(), 2)
+        self.assertEqual(self.active_loan.history.first().history_type, '~')
+        self.assertEqual(self.active_loan.history.first().status, BookLoan.Status.RETURNED)
+
     # --- Просрочка (is_overdue) ---
 
     def test_loan_is_not_overdue(self):
@@ -261,3 +280,37 @@ class BookLoanAPITest(BaseAPITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertFalse(response.json()['is_overdue'])
+
+    # --- Обновление (Продление) ---
+
+    def test_librarian_can_update_due_date_with_reason(self):
+        """Библиотекарь может продлить книгу (изменить due_date) с указанием причины."""
+        self.login_librarian()
+
+        new_due_date = timezone.localdate() + timedelta(days=60)
+        data = {
+            'due_date': str(new_due_date),
+            'change_reason': 'Читатель попросил продлить срок'
+        }
+
+        response = self.client.patch(self.active_loan_details_url, data=data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        self.active_loan.refresh_from_db()
+        self.assertEqual(self.active_loan.due_date, new_due_date)
+
+        # Проверяем, что причина попала в аудит
+        latest_history = self.active_loan.history.first()
+        self.assertEqual(latest_history.history_change_reason, 'Читатель попросил продлить срок')
+
+    def test_librarian_cannot_update_due_date_without_reason(self):
+        """Нельзя изменить due_date без указания причины."""
+        self.login_librarian()
+
+        new_due_date = timezone.localdate() + timedelta(days=60)
+        data = {'due_date': str(new_due_date)}  # Без change_reason
+
+        response = self.client.patch(self.active_loan_details_url, data=data, format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('change_reason', response.json())

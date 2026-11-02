@@ -1,6 +1,7 @@
 from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator
 from django.db import models
+from simple_history.models import HistoricalRecords
 
 from catalog.validators import validate_isbn
 
@@ -27,6 +28,7 @@ class Author(models.Model):
         verbose_name='Псевдоним'
     )
     biography = models.TextField(blank=True, verbose_name='Биография')
+    history = HistoricalRecords()
 
     class Meta:
         verbose_name = 'Автор'
@@ -44,6 +46,7 @@ class Author(models.Model):
 class Genre(models.Model):
     """Жанр произведения."""
     name = models.CharField(max_length=100, unique=True, verbose_name='Название жанра')
+    history = HistoricalRecords()
 
     class Meta:
         verbose_name = 'Жанр'
@@ -57,6 +60,7 @@ class Publisher(models.Model):
     """Издательство."""
     name = models.CharField(max_length=255, unique=True, verbose_name='Название')
     description = models.TextField(blank=True, verbose_name='Описание')
+    history = HistoricalRecords()
 
     class Meta:
         verbose_name = 'Издательство'
@@ -78,6 +82,7 @@ class Work(models.Model):
     )
     writing_year = models.PositiveIntegerField(null=True, blank=True, verbose_name='Год написания')
     description = models.TextField(blank=True, verbose_name='Описание')
+    history = HistoricalRecords()
 
     class Meta:
         db_table = 'works'
@@ -136,6 +141,7 @@ class Edition(models.Model):
         default=Status.ACTIVE,
         verbose_name='Статус'
     )
+    history = HistoricalRecords()
 
     class Meta:
         db_table = 'editions'
@@ -221,6 +227,7 @@ class BookCopy(models.Model):
         blank=True,
         verbose_name='Примечания'
     )
+    history = HistoricalRecords()
 
     class Meta:
         db_table = 'book_copies'

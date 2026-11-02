@@ -83,7 +83,7 @@ class BookCopyAPITest(BaseAPITestCase):
         self.assertEqual(len(response.json()), 1)
         self.assertEqual(response.json()[0]['inventory_number'], self.copy_hobbit.inventory_number)
 
-    # --- Создание и Обновление ---
+    # --- Создание ---
 
     def test_librarian_can_create_copy(self):
         """Библиотекарь может создать новый экземпляр."""
@@ -125,8 +125,10 @@ class BookCopyAPITest(BaseAPITestCase):
         response = self.client.post(self.url, data=self.data, format='json')
         self.assertEqual(response.status_code, 403)
 
-    def test_librarian_can_update_condition(self):
-        """Библиотекарь может обновить состояние книги (например, потрепалась)."""
+    # --- Обновление ---
+
+    def test_librarian_can_update_non_critical_fields_without_reason(self):
+        """Библиотекарь может обновить состояние книги (некритичное поле) без причины."""
         self.login_librarian()
         response = self.client.patch(
             self.details_url,
@@ -137,6 +139,71 @@ class BookCopyAPITest(BaseAPITestCase):
 
         self.copy1.refresh_from_db()
         self.assertEqual(self.copy1.condition, BookCopy.Condition.WORN)
+
+    def test_librarian_cannot_update_critical_field_without_reason_if_loans_exist(self):
+        """Нельзя изменить инвентарный номер без причины, если у книги есть история выдач."""
+        from lending.models import BookLoan
+        from django.utils import timezone
+
+        # Создаем зависимость — выдачу для этой книги
+        BookLoan.objects.create(
+            user=self.user_reader,
+            book_copy=self.copy1,
+            due_date=timezone.localdate(),
+            status=BookLoan.Status.RETURNED
+        )
+
+        self.login_librarian()
+        # Пытаемся изменить инвентарный номер без change_reason
+        response = self.client.patch(
+            self.details_url,
+            data={'inventory_number': 'NEW-INV-123'},
+            format='json'
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('change_reason', response.json())
+
+    def test_librarian_can_update_critical_field_with_reason_if_loans_exist(self):
+        """Можно изменить инвентарный номер с причиной, даже если есть история выдач."""
+        from lending.models import BookLoan
+        from django.utils import timezone
+
+        BookLoan.objects.create(
+            user=self.user_reader,
+            book_copy=self.copy1,
+            due_date=timezone.localdate(),
+            status=BookLoan.Status.RETURNED
+        )
+
+        self.login_librarian()
+        response = self.client.patch(
+            self.details_url,
+            data={
+                'inventory_number': 'NEW-INV-123',
+                'change_reason': 'Испорчен старый штрихкод'
+            },
+            format='json'
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.copy1.refresh_from_db()
+        self.assertEqual(self.copy1.inventory_number, 'NEW-INV-123')
+
+    def test_librarian_can_update_critical_field_without_reason_if_no_loans_exist(self):
+        """Можно изменить инвентарный номер без причины, если книгу еще не выдавали."""
+        self.login_librarian()
+
+        # У self.copy1 из BaseAPITestCase по умолчанию нет выдач
+        response = self.client.patch(
+            self.details_url,
+            data={'inventory_number': 'NEW-INV-456'},
+            format='json'
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.copy1.refresh_from_db()
+        self.assertEqual(self.copy1.inventory_number, 'NEW-INV-456')
 
     # --- Удаление (Мягкое списание) ---
 

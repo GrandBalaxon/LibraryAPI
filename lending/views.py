@@ -76,12 +76,17 @@ class BookLoanViewSet(viewsets.ModelViewSet):
                 )
 
             book_copy = BookCopy.objects.select_for_update().get(pk=loan.book_copy_id)
+            change_reason = 'Возврат книги через API'
 
+            # Обновляем выдачу
             loan.status = BookLoan.Status.RETURNED
             loan.returned_at = timezone.now()
+            loan._change_reason = change_reason
             loan.save(update_fields=['status', 'returned_at'])
 
+            # Обновляем экземпляр книги
             book_copy.status = BookCopy.Status.AVAILABLE
+            book_copy._change_reason = change_reason
             book_copy.save(update_fields=['status'])
 
         return Response(BookLoanSerializer(loan).data)

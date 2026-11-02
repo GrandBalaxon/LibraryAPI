@@ -74,13 +74,46 @@ class GenreAPITest(BaseAPITestCase):
     # --- Обновление ---
 
     def test_librarian_can_update_genre(self):
-        """Библиотекарь может изменять данные жанра."""
+        """Библиотекарь может изменять данные жанра у которого есть экземпляры с указанием причины."""
         self.login_librarian()
-        patch_response = self.client.patch(self.details_url, data=self.data, format='json')
+
+        data = {**self.data, 'change_reason': 'Просто захотелось...'}
+
+        patch_response = self.client.patch(self.details_url, data=data, format='json')
         self.assertEqual(patch_response.status_code, 200)
 
         self.genre.refresh_from_db()
         self.assertEqual(self.genre.name, 'Научная фантастика')
+
+    def test_librarian_can_update_genre_without_copies_tied_to_it(self):
+        """Библиотекарь может изменять данные жанра у которого нет экземпляров без указания причины."""
+        self.login_librarian()
+
+        # создаем новый жанр без привязанных к нему копий
+        post_response = self.client.post(self.url, data=self.data, format='json')
+        self.assertEqual(post_response.status_code, 201)
+
+        # получаем url нового жанра
+        new_genre_id = post_response.json()['id']
+        new_genre_url = f"{self.url}{new_genre_id}/"
+
+        # Меняем данные нового жанра без указания причины
+        new_data = {'name': 'Обновленный жанр без книг'}
+        patch_response = self.client.patch(new_genre_url, data=new_data, format='json')
+        self.assertEqual(patch_response.status_code, 200)
+
+        # Проверяем, что в БД данные действительно поменялись
+        new_genre = Genre.objects.get(id=new_genre_id)
+        self.assertEqual(new_genre.name, 'Обновленный жанр без книг')
+
+    def test_librarian_cannot_update_genre_without_a_change_reason(self):
+        """Библиотекарь НЕ может поменять данные жанра без указания причины изменения."""
+        self.login_librarian()
+
+        patch_response = self.client.patch(self.details_url, data=self.data, format='json')
+
+        self.assertEqual(patch_response.status_code, 400)
+        self.assertIn('change_reason', patch_response.json())
 
     def test_reader_cannot_update_genre(self):
         """Читатель не может менять жанр."""

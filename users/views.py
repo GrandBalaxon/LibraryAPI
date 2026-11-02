@@ -75,10 +75,18 @@ class UserViewSet(
         return [IsAuthenticated(), IsLibrarian()]
 
     def get_queryset(self) -> QuerySet[CustomUser]:
+        # Оптимизация: подтягиваем все выдачи одним запросом (устраняем N+1)
+        queryset = CustomUser.objects.prefetch_related('loans')
+
         user: CustomUser | Any = self.request.user
-        if user.role == CustomUser.Role.LIBRARIAN:
-            return CustomUser.objects.all()
-        return CustomUser.objects.filter(pk=user.pk)
+
+        if user.is_authenticated and user.role == CustomUser.Role.LIBRARIAN:
+            return queryset
+
+        if user.is_authenticated:
+            return queryset.filter(pk=user.pk)
+
+        return queryset.none()
 
     @extend_schema(summary="Получить свой профиль", responses={200: UserSerializer})
     @action(detail=False, methods=["get"])

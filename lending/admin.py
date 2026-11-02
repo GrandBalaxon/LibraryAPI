@@ -6,13 +6,14 @@ from django.db import transaction
 from django.forms.models import ModelForm
 from django.http import HttpRequest
 from django.utils import timezone
+from simple_history.admin import SimpleHistoryAdmin
 
 from catalog.models import BookCopy
 from lending.models import BookLoan
 
 
 @admin.register(BookLoan)
-class BookLoanAdmin(admin.ModelAdmin):
+class BookLoanAdmin(SimpleHistoryAdmin):
     list_display = ('id', 'book_copy', 'user', 'status', 'borrowed_at', 'is_overdue')
     list_filter = ('status',)
     search_fields = ('user__email', 'user__first_name', 'user__last_name', 'book_copy__edition__title',
