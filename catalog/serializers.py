@@ -126,7 +126,7 @@ class BookCopyBriefSerializer(serializers.ModelSerializer):
         fields = ['id', 'inventory_number', 'status', 'condition', 'location']
 
 
-class EditionSerializer(serializers.ModelSerializer):
+class EditionSerializer(ChangeReasonMixin, serializers.ModelSerializer):
     """Сериализатор для конкретного издания произведения."""
     work = WorkBriefSerializer(read_only=True)
     work_id = serializers.PrimaryKeyRelatedField(
@@ -152,6 +152,8 @@ class EditionSerializer(serializers.ModelSerializer):
     copies_count = serializers.SerializerMethodField()
     available_copies_count = serializers.SerializerMethodField()
 
+    critical_fields = ['title', 'publication_year']
+
     class Meta:
         model = Edition
         fields = [
@@ -170,7 +172,7 @@ class EditionSerializer(serializers.ModelSerializer):
             'copies',
             'copies_count',
             'available_copies_count',
-        ]
+        ] + ChangeReasonMixin.Meta.fields
 
     def get_copies_count(self, obj) -> int:
         """Подсчёт всех экземпляров."""
@@ -191,6 +193,9 @@ class EditionSerializer(serializers.ModelSerializer):
     def validate_isbn(self, value: str | None) -> str | None:
         """Валидация и форматирование ISBN на уровне API."""
         return isbn_validator(value)
+
+    def has_dependencies(self, instance: Edition) -> bool:
+        return instance.copies.exists()
 
     def update(self, instance: Edition, validated_data: dict) -> Edition:
         """Запрещаем менять произведение или ISBN, если у издания уже есть копии."""
