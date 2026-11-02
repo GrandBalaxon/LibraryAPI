@@ -77,7 +77,7 @@ jobs:
           DEBUG: "True"
 
   test:
-    name: Run tests and checks
+    name: Run tests
     needs: [checks]
     runs-on: ubuntu-latest
     steps:
