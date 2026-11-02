@@ -216,10 +216,12 @@ class EditionSerializer(ChangeReasonMixin, serializers.ModelSerializer):
         return super().update(instance, validated_data)
 
 
-class BookCopySerializer(serializers.ModelSerializer):
+class BookCopySerializer(ChangeReasonMixin, serializers.ModelSerializer):
     """Сериализатор для управления конкретными экземплярами книг."""
     edition_title = serializers.CharField(source='edition.title', read_only=True)
     work_title = serializers.CharField(source='edition.work.original_title', read_only=True)
+
+    critical_fields = ['edition', 'inventory_number']
 
     class Meta:
         model = BookCopy
@@ -233,10 +235,13 @@ class BookCopySerializer(serializers.ModelSerializer):
             'condition',
             'location',
             'notes',
-        ]
+        ] + ChangeReasonMixin.Meta.fields
         extra_kwargs = {
             'inventory_number': {'required': False},
         }
+
+    def has_dependencies(self, instance: BookCopy) -> bool:
+        return instance.loans.exists()
 
     def create(self, validated_data: dict) -> BookCopy:
         """При создании, если нет инвентарного номера, генерируем его."""
