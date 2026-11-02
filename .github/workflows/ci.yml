@@ -69,11 +69,13 @@ jobs:
         run: poetry run python manage.py check
         env:
           SECRET_KEY: 'dummy-secret-key-for-ci'
+          DEBUG: "True"
 
       - name: Check for missing migrations
         run: poetry run python manage.py makemigrations --check --dry-run
         env:
           SECRET_KEY: 'dummy-secret-key-for-ci'
+          DEBUG: "True"
 
       - name: Run tests
         env:
