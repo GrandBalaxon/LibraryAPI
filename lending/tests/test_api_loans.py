@@ -280,3 +280,37 @@ class BookLoanAPITest(BaseAPITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertFalse(response.json()['is_overdue'])
+
+    # --- Обновление (Продление) ---
+
+    def test_librarian_can_update_due_date_with_reason(self):
+        """Библиотекарь может продлить книгу (изменить due_date) с указанием причины."""
+        self.login_librarian()
+
+        new_due_date = timezone.localdate() + timedelta(days=60)
+        data = {
+            'due_date': str(new_due_date),
+            'change_reason': 'Читатель попросил продлить срок'
+        }
+
+        response = self.client.patch(self.active_loan_details_url, data=data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        self.active_loan.refresh_from_db()
+        self.assertEqual(self.active_loan.due_date, new_due_date)
+
+        # Проверяем, что причина попала в аудит
+        latest_history = self.active_loan.history.first()
+        self.assertEqual(latest_history.history_change_reason, 'Читатель попросил продлить срок')
+
+    def test_librarian_cannot_update_due_date_without_reason(self):
+        """Нельзя изменить due_date без указания причины."""
+        self.login_librarian()
+
+        new_due_date = timezone.localdate() + timedelta(days=60)
+        data = {'due_date': str(new_due_date)}  # Без change_reason
+
+        response = self.client.patch(self.active_loan_details_url, data=data, format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('change_reason', response.json())
