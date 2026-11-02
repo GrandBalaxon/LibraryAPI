@@ -47,6 +47,17 @@ class UserAPITest(APITestCase):
 
     # ---------- Тесты ----------
 
+    def test_login_get_jwt(self):
+        """Получение JWT токена."""
+        data = {"email": "reader@test.ru", "password": "password123"}
+        response = self.client.post(self.token_url, data, format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn('access', response.json())
+        self.assertIn('refresh', response.json())
+
+    # --- Создание ---
+
     def test_register_user_success(self):
         """Успешная регистрация нового пользователя."""
         data = {
@@ -76,14 +87,19 @@ class UserAPITest(APITestCase):
         self.assertIn('phone_number', response.json())
         self.assertEqual(response.json()['phone_number'][0], 'Некорректный номер телефона.')
 
-    def test_login_get_jwt(self):
-        """Получение JWT токена."""
-        data = {"email": "reader@test.ru", "password": "password123"}
-        response = self.client.post(self.token_url, data, format='json')
+    def test_register_user_with_change_reason_does_not_crash(self):
+        """Проверяем, что лишнее поле change_reason при регистрации не ломает UserSerializer.create()."""
+        data = {
+            "email": "new_with_reason@test.ru", "password": "password123",
+            "first_name": "Новый", "last_name": "Юзер",
+            "phone_number": "89998887777", "place_of_birth": "СПБ",
+            "change_reason": "Регистрация с причиной"
+        }
+        response = self.client.post(self.register_url, data=data, format='json')
+        # Ожидаем 201, так как create() должен был сделать pop('change_reason')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertIn('access', response.json())
-        self.assertIn('refresh', response.json())
+    # --- Чтение ---
 
     def test_get_my_profile(self):
         """Получение своего профиля через me."""
@@ -111,6 +127,8 @@ class UserAPITest(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
+    # --- Обновление ---
+
     def test_update_own_profile(self):
         """Пользователь может обновить свой профиль."""
         self.login_reader()
@@ -132,6 +150,49 @@ class UserAPITest(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.reader.refresh_from_db()
         self.assertTrue(self.reader.check_password("newsuperpassword"))
+
+    def test_update_email_without_reason_fails(self):
+        """Нельзя изменить email (критичное поле) без указания причины."""
+        self.login_reader()
+        url = f"{self.list_url}{self.reader.id}/"
+
+        response = self.client.patch(url, {"email": "new_email@test.ru"}, format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('change_reason', response.json())
+
+    def test_update_phone_without_reason_fails(self):
+        """Нельзя изменить телефон (критичное поле) без указания причины."""
+        self.login_reader()
+        url = f"{self.list_url}{self.reader.id}/"
+
+        response = self.client.patch(url, {"phone_number": "+7 (999) 000-00-00"}, format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('change_reason', response.json())
+
+    def test_update_critical_field_with_reason_succeeds(self):
+        """Можно изменить email с указанием причины, и она попадёт в историю."""
+        self.login_reader()
+        url = f"{self.list_url}{self.reader.id}/"
+
+        data = {
+            "email": "updated_email@test.ru",
+            "change_reason": "Смена основной почты"
+        }
+        response = self.client.patch(url, data=data, format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        # Проверяем, что email действительно обновился
+        self.reader.refresh_from_db()
+        self.assertEqual(self.reader.email, "updated_email@test.ru")
+
+        # Проверяем, что причина записалась в историю (django-simple-history)
+        latest_history = self.reader.history.first()
+        self.assertEqual(latest_history.history_change_reason, "Смена основной почты")
+
+    # --- Удаление (Мягкое списание) ---
 
     def test_librarian_can_deactivate_user(self):
         """Библиотекарь может деактивировать пользователя (Soft Delete)."""
