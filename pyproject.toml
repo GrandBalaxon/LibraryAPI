@@ -74,6 +74,7 @@ omit = [
     "*/asgi.py",
     "*/tests/*",
 ]
+relative_files = true
 
 [tool.coverage.report]
 show_missing = true

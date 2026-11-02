@@ -4,6 +4,8 @@
 
 <div align="center">
 
+[![Django CI](https://github.com/GrandBalaxon/LibraryAPI/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/GrandBalaxon/LibraryAPI/actions/workflows/ci.yml)
+[![Coverage](https://raw.githubusercontent.com/GrandBalaxon/LibraryAPI/python-coverage-comment-action-data/coverage.svg)](https://github.com/GrandBalaxon/LibraryAPI/actions/workflows/coverage.yml)
 ![Python](https://img.shields.io/badge/python-3.14-blue.svg)
 ![Django](https://img.shields.io/badge/django-6.1-green.svg)
 ![DRF](https://img.shields.io/badge/django%20rest%20framework-3.18-red.svg)
