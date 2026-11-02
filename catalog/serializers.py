@@ -1,77 +1,91 @@
 from rest_framework import serializers
 
-from catalog.models import Author, Genre, Publisher, Book, BookEdition
-
-
-class AuthorSerializer(serializers.ModelSerializer):
-    """Сериализатор для авторов."""
-    books_written = serializers.SerializerMethodField()
-    books_translated = serializers.SerializerMethodField()
-
-    class Meta:
-        model = Author
-        fields = [
-            'id',
-            'first_name',
-            'last_name',
-            'middle_name',
-            'birth_date',
-            'full_name',
-            'pseudonym',
-            'biography',
-            'books_written',
-            'books_translated',
-        ]
-        read_only_fields = ['full_name']
-
-    def get_books_written(self, obj) -> int:
-        if hasattr(obj, 'book_count'):
-            return obj.book_count
-        return obj.books.count()
-
-    def get_books_translated(self, obj) -> int:
-        if hasattr(obj, 'translations_count'):
-            return obj.translations_count
-        return obj.translations.count()
+from catalog.mixins import ChangeReasonMixin
+from catalog.models import Author, Genre, Publisher, Work, Edition, BookCopy
+from catalog.validators import validate_isbn as isbn_validator
 
 
 class AuthorBriefSerializer(serializers.ModelSerializer):
     """Краткая информация об авторе для вложенных объектов."""
+
     class Meta:
         model = Author
         fields = ['id', 'full_name', 'pseudonym']
 
 
-class GenreSerializer(serializers.ModelSerializer):
+class AuthorSerializer(ChangeReasonMixin, AuthorBriefSerializer):
+    """Полный сериализатор для авторов."""
+    works_written = serializers.SerializerMethodField()
+    works_translated = serializers.SerializerMethodField()
+
+    critical_fields = ['first_name', 'last_name', 'middle_name']
+
+    class Meta(AuthorBriefSerializer.Meta):
+        fields = AuthorBriefSerializer.Meta.fields + [
+            'first_name',
+            'last_name',
+            'middle_name',
+            'birth_date',
+            'biography',
+            'works_written',
+            'works_translated'
+        ] + ChangeReasonMixin.Meta.fields
+        read_only_fields = ['full_name']
+
+    def get_works_written(self, obj) -> int:
+        if hasattr(obj, 'works_count'):
+            return obj.works_count
+        return obj.works.count()
+
+    def get_works_translated(self, obj) -> int:
+        if hasattr(obj, 'translations_count'):
+            return obj.translations_count
+        return obj.translations.count()
+
+    def has_dependencies(self, instance: Author) -> bool:
+        return instance.works.exists()
+
+
+class GenreSerializer(ChangeReasonMixin, serializers.ModelSerializer):
     """Сериализатор для жанров."""
+    critical_fields = ['name']
+
     class Meta:
         model = Genre
-        fields = ['id', 'name']
+        fields = ['id', 'name'] + ChangeReasonMixin.Meta.fields
+
+    def has_dependencies(self, instance: Genre) -> bool:
+        return instance.works.exists()
 
 
 class PublisherBriefSerializer(serializers.ModelSerializer):
     """Сериализатор для издательств без описания."""
+
     class Meta:
         model = Publisher
         fields = ['id', 'name']
 
 
-class PublisherSerializer(PublisherBriefSerializer):
+class PublisherSerializer(ChangeReasonMixin, PublisherBriefSerializer):
     """Полный сериализатор для издательства (с описанием)."""
+    critical_fields = ['name']
+
     class Meta(PublisherBriefSerializer.Meta):
-        fields = PublisherBriefSerializer.Meta.fields + ['description']
+        fields = PublisherBriefSerializer.Meta.fields + ['description'] + ChangeReasonMixin.Meta.fields
+
+    def has_dependencies(self, instance: Publisher) -> bool:
+        return instance.editions.exists()
 
 
-class BookBriefSerializer(serializers.ModelSerializer):
-    """Краткая информация о произведении (базовый для полного)."""
+class WorkBriefSerializer(serializers.ModelSerializer):
+    """Краткая информация о произведении."""
     authors = AuthorBriefSerializer(many=True, read_only=True)
     genres = GenreSerializer(many=True, read_only=True)
 
     class Meta:
-        model = Book
+        model = Work
         fields = [
             'id',
-            'title',
             'original_title',
             'original_language',
             'writing_year',
@@ -81,7 +95,7 @@ class BookBriefSerializer(serializers.ModelSerializer):
         ]
 
 
-class BookSerializer(BookBriefSerializer):
+class WorkSerializer(ChangeReasonMixin, WorkBriefSerializer):
     """Полный сериализатор произведения с полями для записи связей."""
     author_ids = serializers.PrimaryKeyRelatedField(
         source='authors',
@@ -95,17 +109,29 @@ class BookSerializer(BookBriefSerializer):
         many=True,
         write_only=True
     )
+    critical_fields = ['original_title']
 
-    class Meta(BookBriefSerializer.Meta):
-        fields = BookBriefSerializer.Meta.fields + ['author_ids', 'genre_ids']
+    class Meta(WorkBriefSerializer.Meta):
+        fields = WorkBriefSerializer.Meta.fields + ['author_ids', 'genre_ids'] + ChangeReasonMixin.Meta.fields
+
+    def has_dependencies(self, instance: Work) -> bool:
+        return instance.editions.exists()
 
 
-class BookEditionSerializer(serializers.ModelSerializer):
+class BookCopyBriefSerializer(serializers.ModelSerializer):
+    """Краткая информация об экземпляре (для вложения в Edition)."""
+
+    class Meta:
+        model = BookCopy
+        fields = ['id', 'inventory_number', 'status', 'condition', 'location']
+
+
+class EditionSerializer(ChangeReasonMixin, serializers.ModelSerializer):
     """Сериализатор для конкретного издания произведения."""
-    book = BookBriefSerializer(read_only=True)
-    book_id = serializers.PrimaryKeyRelatedField(
-        source='book',
-        queryset=Book.objects.all(),
+    work = WorkBriefSerializer(read_only=True)
+    work_id = serializers.PrimaryKeyRelatedField(
+        source='work',
+        queryset=Work.objects.all(),
         write_only=True
     )
     publishers = PublisherBriefSerializer(read_only=True, many=True)
@@ -122,15 +148,19 @@ class BookEditionSerializer(serializers.ModelSerializer):
         write_only=True,
         many=True
     )
-    available_copies = serializers.IntegerField(read_only=True)
+    copies = BookCopyBriefSerializer(many=True, read_only=True)
+    copies_count = serializers.SerializerMethodField()
+    available_copies_count = serializers.SerializerMethodField()
+
+    critical_fields = ['title', 'publication_year']
 
     class Meta:
-        model = BookEdition
+        model = Edition
         fields = [
             'id',
+            'work',
+            'work_id',
             'title',
-            'book',
-            'book_id',
             'isbn',
             'publishers',
             'publisher_ids',
@@ -138,13 +168,87 @@ class BookEditionSerializer(serializers.ModelSerializer):
             'language',
             'translators',
             'translator_ids',
-            'total_copies',
-            'available_copies',
-        ]
+            'pages',
+            'copies',
+            'copies_count',
+            'available_copies_count',
+        ] + ChangeReasonMixin.Meta.fields
 
-    def clean(self, validated_data):
-        # Устанавливаем доступные копии равными общему количеству при создании
-        validated_data['available_copies'] = validated_data.get('total_copies')
+    def get_copies_count(self, obj) -> int:
+        """Подсчёт всех экземпляров."""
+        # Если ViewSet сделал annotate (список), берем готовое число из базы
+        if hasattr(obj, 'total_copies_count'):
+            return obj.total_copies_count
+        # Если объект запрашивается в одиночку (retrieve), считаем вручную
+        return obj.copies.count()
+
+    def get_available_copies_count(self, obj) -> int:
+        """Подсчёт экземпляров, у которых статус AVAILABLE."""
+        # Если ViewSet сделал annotate (список), берем готовое число из базы
+        if hasattr(obj, 'available_copies_count'):
+            return obj.available_copies_count
+        # Если объект запрашивается в одиночку (retrieve), считаем вручную
+        return obj.copies.filter(status=BookCopy.Status.AVAILABLE).count()
+
+    def validate_isbn(self, value: str | None) -> str | None:
+        """Валидация и форматирование ISBN на уровне API."""
+        return isbn_validator(value)
+
+    def has_dependencies(self, instance: Edition) -> bool:
+        return instance.copies.exists()
+
+    def update(self, instance: Edition, validated_data: dict) -> Edition:
+        """Запрещаем менять произведение или ISBN, если у издания уже есть копии."""
+        has_copies = instance.copies.exists()
+
+        if has_copies:
+            # Проверка на изменение Work
+            if 'work' in validated_data and validated_data['work'] != instance.work:
+                raise serializers.ValidationError(
+                    {'work_id': ['Нельзя изменить произведение у издания, которое уже поступило в библиотеку.']}
+                )
+            # Проверка на изменение ISBN
+            if 'isbn' in validated_data and validated_data['isbn'] != instance.isbn:
+                raise serializers.ValidationError(
+                    {'isbn': ['Нельзя изменить ISBN, так как на обложках экземпляров напечатан старый номер.']}
+                )
+
+        return super().update(instance, validated_data)
+
+
+class BookCopySerializer(ChangeReasonMixin, serializers.ModelSerializer):
+    """Сериализатор для управления конкретными экземплярами книг."""
+    edition_title = serializers.CharField(source='edition.title', read_only=True)
+    work_title = serializers.CharField(source='edition.work.original_title', read_only=True)
+
+    critical_fields = ['edition', 'inventory_number']
+
+    class Meta:
+        model = BookCopy
+        fields = [
+            'id',
+            'edition',
+            'edition_title',
+            'work_title',
+            'inventory_number',
+            'status',
+            'condition',
+            'location',
+            'notes',
+        ] + ChangeReasonMixin.Meta.fields
+        extra_kwargs = {
+            'inventory_number': {'required': False},
+        }
+
+    def has_dependencies(self, instance: BookCopy) -> bool:
+        return instance.loans.exists()
+
+    def create(self, validated_data: dict) -> BookCopy:
+        """При создании, если нет инвентарного номера, генерируем его."""
+        if not validated_data.get('inventory_number'):
+            edition = validated_data['edition']
+            validated_data['inventory_number'] = edition.generate_next_inventory_number()
+
         return super().create(validated_data)
 
 

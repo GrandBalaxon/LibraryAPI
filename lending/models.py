@@ -1,7 +1,8 @@
 from django.db import models
 from django.utils import timezone
+from simple_history.models import HistoricalRecords
 
-from catalog.models import BookEdition
+from catalog.models import BookCopy
 from config import settings
 
 
@@ -14,15 +15,15 @@ class BookLoan(models.Model):
 
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
-        on_delete=models.CASCADE,
+        on_delete=models.PROTECT,
         related_name='loans',
         verbose_name='Читатель'
     )
-    book = models.ForeignKey(
-        BookEdition,
-        on_delete=models.CASCADE,
+    book_copy = models.ForeignKey(
+        BookCopy,
+        on_delete=models.PROTECT,
         related_name='loans',
-        verbose_name='Книга'
+        verbose_name='Экземпляр книги'
     )
     borrowed_at = models.DateTimeField(
         auto_now_add=True,
@@ -45,9 +46,10 @@ class BookLoan(models.Model):
         default=Status.ACTIVE,
         verbose_name='Статус'
     )
+    history = HistoricalRecords()
 
     @property
-    def is_overdue(self):
+    def is_overdue(self) -> bool:
         """Просрочен ли возврат книги."""
         return self.status == self.Status.ACTIVE and self.due_date and self.due_date < timezone.localdate()
 
@@ -56,5 +58,5 @@ class BookLoan(models.Model):
         verbose_name_plural = 'Выдачи книг'
         ordering = ['-borrowed_at']
 
-    def __str__(self):
-        return f'{self.user} — {self.book} ({self.get_status_display()})'
+    def __str__(self) -> str:
+        return f'{self.user} — {self.book_copy} ({self.get_status_display()})'

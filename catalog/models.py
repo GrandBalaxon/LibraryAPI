@@ -1,6 +1,9 @@
 from django.core.exceptions import ValidationError
+from django.core.validators import MinValueValidator
 from django.db import models
-from stdnum import isbn
+from simple_history.models import HistoricalRecords
+
+from catalog.validators import validate_isbn
 
 
 class Author(models.Model):
@@ -25,6 +28,7 @@ class Author(models.Model):
         verbose_name='Псевдоним'
     )
     biography = models.TextField(blank=True, verbose_name='Биография')
+    history = HistoricalRecords()
 
     class Meta:
         verbose_name = 'Автор'
@@ -35,19 +39,20 @@ class Author(models.Model):
     def full_name(self) -> str:
         return f'{self.last_name} {self.first_name} {self.middle_name or ""}'.strip()
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.full_name
 
 
 class Genre(models.Model):
-    """Жанр книги."""
+    """Жанр произведения."""
     name = models.CharField(max_length=100, unique=True, verbose_name='Название жанра')
+    history = HistoricalRecords()
 
     class Meta:
         verbose_name = 'Жанр'
         verbose_name_plural = 'Жанры'
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.name
 
 
@@ -55,43 +60,51 @@ class Publisher(models.Model):
     """Издательство."""
     name = models.CharField(max_length=255, unique=True, verbose_name='Название')
     description = models.TextField(blank=True, verbose_name='Описание')
+    history = HistoricalRecords()
 
     class Meta:
         verbose_name = 'Издательство'
         verbose_name_plural = 'Издательства'
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.name
 
 
-class Book(models.Model):
-    """Книга в библиотечном каталоге."""
-    title = models.CharField(max_length=255, verbose_name='Название')
+class Work(models.Model):
+    """Произведение/Работа автора (писателя)."""
     original_title = models.CharField(max_length=255, verbose_name='Оригинальное название')
     original_language = models.CharField(max_length=50, verbose_name='Язык оригинала')
     authors = models.ManyToManyField(
-        Author, related_name='books', verbose_name='Авторы'
+        Author, related_name='works', verbose_name='Авторы'
     )
     genres = models.ManyToManyField(
-        Genre, related_name='books', blank=True, verbose_name='Жанры'
+        Genre, related_name='works', blank=True, verbose_name='Жанры'
     )
     writing_year = models.PositiveIntegerField(null=True, blank=True, verbose_name='Год написания')
     description = models.TextField(blank=True, verbose_name='Описание')
+    history = HistoricalRecords()
 
     class Meta:
-        db_table = 'books'
+        db_table = 'works'
         verbose_name = 'Произведение'
         verbose_name_plural = 'Произведения'
-        ordering = ['title']
+        ordering = ['original_title']
 
-    def __str__(self):
-        return self.title
+    def __str__(self) -> str:
+        return self.original_title
 
 
-class BookEdition(models.Model):
-    """Конкретное издание книги."""
-    book = models.ForeignKey(
-        Book, on_delete=models.CASCADE, related_name='editions', verbose_name='Произведение'
+class Edition(models.Model):
+    """
+    Конкретный выпуск (публикация) произведения в определенном издательстве,
+    объединяющий экземпляры с одинаковым ISBN и годом выпуска.
+    """
+    class Status(models.TextChoices):
+        ACTIVE = 'active', 'Активно'
+        ARCHIVED = 'archived', 'В архиве'
+
+    work = models.ForeignKey(
+        Work, on_delete=models.PROTECT, related_name='editions', verbose_name='Произведение'
     )
     title = models.CharField(max_length=255, verbose_name="Название перевода")
     isbn = models.CharField(
@@ -108,6 +121,7 @@ class BookEdition(models.Model):
         verbose_name='Издательства'
     )
     publication_year = models.PositiveIntegerField(
+        validators=[MinValueValidator(1)],
         verbose_name='Год издания'
     )
     language = models.CharField(max_length=50, verbose_name='Язык')
@@ -117,27 +131,108 @@ class BookEdition(models.Model):
         related_name='translations',
         verbose_name='Авторы перевода'
     )
-    total_copies = models.PositiveIntegerField(default=1, verbose_name='Всего экземпляров')
-    available_copies = models.PositiveIntegerField(default=1, verbose_name='Доступно экземпляров')
+    pages = models.PositiveIntegerField(
+        validators=[MinValueValidator(1)],
+        verbose_name='Количество страниц'
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.ACTIVE,
+        verbose_name='Статус'
+    )
+    history = HistoricalRecords()
 
     class Meta:
-        db_table = 'book_editions'
-        verbose_name = 'Изданная книга'
-        verbose_name_plural = 'Изданные книги'
+        db_table = 'editions'
+        verbose_name = 'Издание'
+        verbose_name_plural = 'Издания'
         ordering = ['title']
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f'{self.title} ({self.publication_year})'
 
-    def clean(self):
+    def can_be_archived(self) -> bool:
+        """
+        Проверка возможности архивирования издания:
+        * Если все экземпляры списаны (или их вообще нет) — вернёт True.
+        * Если хотя бы один экземпляр не списан — вернёт False.
+        """
+        return not self.copies.exclude(status=BookCopy.Status.WRITTEN_OFF).exists()
+
+    def generate_next_inventory_number(self) -> str:
+        """Генерирует следующий уникальный инвентарный номер для копии этого издания."""
+        existing_count = self.copies.count()
+        base_identifier = self.isbn or f'ED-{self.id}'
+        return f'{base_identifier}-{existing_count + 1}'
+
+    def clean(self) -> None:
         super().clean()
         if self.isbn:
             try:
-                # Валидируем и получаем компактный вид
-                compact_isbn = isbn.validate(self.isbn)
-                # Форматируем: приводим к ISBN-13 и добавляем правильные дефисы
-                self.isbn = isbn.format(compact_isbn, convert=True)
-            except (isbn.InvalidLength, isbn.InvalidChecksum):
-                raise ValidationError({'isbn': 'Некорректный формат или контрольная сумма ISBN.'})
-            except Exception:
-                raise ValidationError({'isbn': 'Некорректный ISBN'})
+                self.isbn = validate_isbn(self.isbn)
+            except ValidationError as exc:
+                # Оборачиваем под ключ поля, чтобы в админке/формах ошибка встала напротив input'а isbn
+                raise ValidationError({'isbn': exc.messages}) from exc
+
+
+class BookCopy(models.Model):
+    """
+    Конкретный физический экземпляр выпущенной книги (Edition).
+    """
+    class Status(models.TextChoices):
+        AVAILABLE = 'available', 'Доступна'
+        BORROWED = 'borrowed', 'Выдана'
+        RESERVED = 'reserved', 'Зарезервирована'
+        LOST = 'lost', 'Утеряна'
+        WRITTEN_OFF = 'written_off', 'Списана'
+
+    class Condition(models.TextChoices):
+        NEW = 'new', 'Новая'
+        GOOD = 'good', 'Хорошая'
+        WORN = 'worn', 'Потрёпанная'
+        DAMAGED = 'damaged', 'Повреждённая'
+
+    edition = models.ForeignKey(
+        Edition,
+        on_delete=models.PROTECT,
+        related_name='copies',
+        verbose_name='Издание'
+    )
+    inventory_number = models.CharField(
+        max_length=50,
+        unique=True,
+        verbose_name='Инвентарный номер',
+        help_text='Уникальный штрихкод или номер экземпляра'
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.AVAILABLE,
+        verbose_name='Статус'
+    )
+    condition = models.CharField(
+        max_length=20,
+        choices=Condition.choices,
+        default=Condition.NEW,
+        verbose_name='Состояние'
+    )
+    location = models.CharField(
+        max_length=100,
+        blank=True,
+        verbose_name='Местоположение',
+        help_text='Например: Зал 1, стеллаж 4, полка 2'
+    )
+    notes = models.TextField(
+        blank=True,
+        verbose_name='Примечания'
+    )
+    history = HistoricalRecords()
+
+    class Meta:
+        db_table = 'book_copies'
+        verbose_name = 'Экземпляр книги'
+        verbose_name_plural = 'Экземпляры книг'
+
+    def __str__(self) -> str:
+        return f'{self.edition.title} [{self.inventory_number}]'

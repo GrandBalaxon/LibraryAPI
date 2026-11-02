@@ -1,4 +1,6 @@
 from rest_framework.permissions import BasePermission, SAFE_METHODS
+from rest_framework.request import Request
+from rest_framework.views import APIView
 
 from users.models import CustomUser
 
@@ -7,9 +9,10 @@ class IsLibrarian(BasePermission):
     """Разрешение только для библиотекарей."""
     message = 'Только библиотекарь может выполнять это действие.'
 
-    def has_permission(self, request, view):
+    def has_permission(self, request: Request, view: APIView) -> bool:
+        user: CustomUser = request.user
         return (
-            request.user.is_authenticated and request.user.role == CustomUser.Role.LIBRARIAN
+            user.is_authenticated and user.role == CustomUser.Role.LIBRARIAN
         )
 
 
@@ -17,12 +20,14 @@ class IsLibrarianOrReadOnly(BasePermission):
     """Чтение для всех аутентифицированных, запись — только библиотекарям."""
     message = 'Только библиотекарь может изменять данные.'
 
-    def has_permission(self, request, view):
-        if not request.user.is_authenticated:
+    def has_permission(self, request: Request, view: APIView) -> bool:
+        user: CustomUser = request.user
+
+        if not user.is_authenticated:
             return False
         if request.method in SAFE_METHODS:
             return True
-        return request.user.role == CustomUser.Role.LIBRARIAN
+        return user.role == CustomUser.Role.LIBRARIAN
 
 
 class IsOwnerOrLibrarian(BasePermission):
@@ -31,9 +36,11 @@ class IsOwnerOrLibrarian(BasePermission):
     """
     message = 'Вы можете изменять только свой профиль.'
 
-    def has_object_permission(self, request, view, obj):
+    def has_object_permission(self, request: Request, view: APIView, obj: CustomUser) -> bool:
+        user: CustomUser = request.user
+
         if request.method in SAFE_METHODS:
             return True
-        if request.user.role == CustomUser.Role.LIBRARIAN:
+        if user.role == CustomUser.Role.LIBRARIAN:
             return True
-        return obj.pk == request.user.pk
+        return obj.pk == user.pk

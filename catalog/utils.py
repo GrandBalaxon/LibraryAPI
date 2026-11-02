@@ -1,9 +1,15 @@
+from typing import TypeVar, Type
+
 from drf_spectacular.utils import extend_schema, extend_schema_view
+from rest_framework.viewsets import ViewSet
+
+T = TypeVar('T', bound=ViewSet)
 
 
-def standard_viewset_schema(tags):
+def standard_viewset_schema(tags: list[str]):
     """Декоратор, добавляющий стандартные summaries и теги для ViewSet."""
-    def decorator(viewset_class):
+
+    def decorator(viewset_class: Type[T]) -> Type[T]:
         # Применяем extend_schema с тегами
         viewset_class = extend_schema(tags=tags)(viewset_class)
         # Применяем extend_schema_view со стандартными summaries
@@ -15,5 +21,7 @@ def standard_viewset_schema(tags):
             partial_update=extend_schema(summary='Частичное обновление'),
             destroy=extend_schema(summary='Удаление')
         )(viewset_class)
+
         return viewset_class
+
     return decorator

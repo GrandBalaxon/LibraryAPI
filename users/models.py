@@ -1,15 +1,17 @@
 import re
+from typing import Any
 
 from django.contrib.auth.base_user import BaseUserManager
 from django.contrib.auth.models import AbstractUser
 from django.core.exceptions import ValidationError
 from django.db import models
+from simple_history.models import HistoricalRecords
 
 
-class CustomUserManager(BaseUserManager):
+class CustomUserManager(BaseUserManager['CustomUser']):
     """Кастомный менеджер для модели пользователя."""
 
-    def create_user(self, email, password=None, **extra_fields):
+    def create_user(self, email: str, password: str | None = None, **extra_fields: Any) -> 'CustomUser':
         if not email:
             raise ValueError('Email обязателен.')
         email = self.normalize_email(email)
@@ -18,7 +20,7 @@ class CustomUserManager(BaseUserManager):
         user.save(using=self._db)
         return user
 
-    def create_superuser(self, email, password=None, **extra_fields):
+    def create_superuser(self, email: str, password: str | None = None, **extra_fields: Any) -> 'CustomUser':
         extra_fields.setdefault('is_staff', True)
         extra_fields.setdefault('is_superuser', True)
         # Суперпользователь автоматически становится библиотекарем
@@ -34,6 +36,7 @@ class CustomUserManager(BaseUserManager):
 
 class CustomUser(AbstractUser):
     """Кастомная модель пользователя."""
+
     class Role(models.TextChoices):
         READER = 'reader', 'Читатель'
         LIBRARIAN = 'librarian', 'Библиотекарь'
@@ -59,6 +62,7 @@ class CustomUser(AbstractUser):
     last_name = models.CharField(max_length=150, verbose_name='Фамилия')
     phone_number = models.CharField(max_length=20, unique=True, verbose_name='Номер телефона')
     place_of_birth = models.CharField(max_length=150, verbose_name='Город рождения')
+    history = HistoricalRecords()
 
     @property
     def full_name(self) -> str:
@@ -107,7 +111,7 @@ class CustomUser(AbstractUser):
         # Форматируем
         return f'+7 ({digits[1:4]}) {digits[4:7]}-{digits[7:9]}-{digits[9:11]}'
 
-    def clean(self):
+    def clean(self) -> None:
         super().clean()
         if self.phone_number:
             normalized = self.normalize_phone_number(self.phone_number)
@@ -115,7 +119,9 @@ class CustomUser(AbstractUser):
                 raise ValidationError({'phone_number': 'Некорректный номер телефона.'})
             self.phone_number = normalized
 
-    def save(self, *args, **kwargs):
+    def save(self, *args: Any, **kwargs: Any) -> None:
         if self.phone_number:
-            self.phone_number = self.normalize_phone_number(self.phone_number)
+            normalized = self.normalize_phone_number(self.phone_number)
+            if normalized:
+                self.phone_number = normalized
         super().save(*args, **kwargs)

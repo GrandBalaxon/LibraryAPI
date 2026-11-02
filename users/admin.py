@@ -1,11 +1,12 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
+from simple_history.admin import SimpleHistoryAdmin
 
 from users.models import CustomUser
 
 
 @admin.register(CustomUser)
-class CustomUserAdmin(UserAdmin):
+class CustomUserAdmin(SimpleHistoryAdmin, UserAdmin):
     list_display = ('id', 'full_name', 'email', 'phone_number', 'role', 'is_active', 'date_joined')
     list_filter = ('role', 'is_staff', 'is_superuser', 'is_active')
     search_fields = ('email', 'first_name', 'last_name', 'middle_name')
@@ -32,5 +33,5 @@ class CustomUserAdmin(UserAdmin):
     )
 
     @admin.display(description='Полное имя')
-    def full_name(self, obj):
+    def full_name(self, obj: CustomUser) -> str:
         return obj.full_name
