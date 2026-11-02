@@ -35,12 +35,11 @@ jobs:
       - name: Run Flake8
         run: poetry run flake8 .
 
-
-  test:
-    name: Run tests and checks
+  checks:
+    name: Run system and migration checks
     runs-on: ubuntu-latest
     steps:
-      - name: Check out Code
+      - name: Check out code
         uses: actions/checkout@v4
 
       - name: Set up Python
@@ -76,6 +75,36 @@ jobs:
         env:
           SECRET_KEY: 'dummy-secret-key-for-ci'
           DEBUG: "True"
+
+  test:
+    name: Run tests and checks
+    needs: [checks]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.14'
+
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+
+      - name: Load cached venv
+        id: cached-poetry-dependencies
+        uses: actions/cache@v3
+        with:
+          path: .venv
+          key: venv-${{ runner.os }}-${{ hashFiles('**/poetry.lock') }}
+
+      - name: Install dependencies
+        if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
+        run: poetry install --no-interaction --no-root --with dev
 
       - name: Run tests
         env:
